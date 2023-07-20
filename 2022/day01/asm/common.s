@@ -104,3 +104,36 @@ parse_file:
         pop %rbx
         pop %rbp
         ret
+
+        .type record_time, function
+        .global record_time
+
+record_time:
+        mov %rdi, %rsi
+        mov $1, %rdi
+        call clock_gettime
+        ret
+        
+        .type print_elapsed, function
+        .global print_elapsed
+
+print_elapsed:
+        
+/* Registers:
+   rdi - pointer to T0 struct
+   rsi - pointer to T1 struct
+        */
+        mov (%rsi), %rax
+        sub (%rdi), %rax
+        mov $1000000000, %rcx
+        mul %rcx
+        add 8(%rsi), %rax
+        sub 8(%rdi), %rax
+        mov %rax, %rsi
+        mov $outmsg, %rdi
+        mov $0, %eax
+        call printf
+        ret
+
+        .section .rodata
+outmsg: .asciz "Elapsed time: %dns\n"

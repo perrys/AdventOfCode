@@ -2,6 +2,11 @@
         .section .rodata
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
+        .equ N_COUNT, 1000000000
+
+        .section .data
+.t0:    .quad 0,0           
+.t1:    .quad 0,0           
 
 .out_msg: .asciz "Top 3 sum to: %ld\n"
 
@@ -19,12 +24,30 @@ _start:
         mov $in_buffer, %rsi
         call read_file
 
+        push %rax
+        push %rdi
+        mov $.t0, %rdi
+        call record_time
+        pop %rdi
+        pop %rax
+
         add $in_buffer, %rax
         mov %rax, %rsi
         mov $in_buffer, %rdi
         mov $top3, %rdx
+        mov $N_COUNT, %r15
+.l0:    cmp $0, %r15
+        je .l0d
         call parse_file
-        
+        dec %r15
+        jmp .l0
+.l0d:        
+        mov $.t1, %edi
+        call record_time
+        mov $.t0, %edi
+        mov $.t1, %esi
+        call print_elapsed
+
         mov $max_vals, %rbx
         mov $0, %rsi
         mov $0, %rdi
