@@ -2,7 +2,7 @@
         .section .rodata
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
-        .equ N_COUNT, 1000000000
+        .equ N_COUNT, 10000000
 
         .section .data
 .t0:    .quad 0,0           
@@ -24,28 +24,40 @@ _start:
         mov $in_buffer, %rsi
         call read_file
 
-        push %rax
-        push %rdi
-        mov $.t0, %rdi
-        call record_time
-        pop %rdi
-        pop %rax
-
-        add $in_buffer, %rax
-        mov %rax, %rsi
-        mov $in_buffer, %rdi
-        mov $top3, %rdx
+        add $in_buffer, %rax 
+        mov %rax, %rsi       /* end of buffer */
+        mov $in_buffer, %rdi /* start of buffer */
+        mov $top3, %rdx      /* function pointer */
         mov $N_COUNT, %r15
 .l0:    cmp $0, %r15
         je .l0d
+
+        push %rdi
+        push %rsi
+        push %rdx
+        mov $.t0, %rdi
+        call record_time
+        pop %rdx
+        pop %rsi
+        pop %rdi
+
         call parse_file
+
+        push %rdi
+        push %rsi
+        push %rdx
+        mov $.t1, %rdi
+        call record_time
+        mov $.t0, %rdi
+        mov $.t1, %rsi
+        call mark_time
+        pop %rdx
+        pop %rsi
+        pop %rdi
+
         dec %r15
         jmp .l0
 .l0d:        
-        mov $.t1, %edi
-        call record_time
-        mov $.t0, %edi
-        mov $.t1, %esi
         call print_elapsed
 
         mov $max_vals, %rbx

@@ -109,31 +109,70 @@ parse_file:
         .global record_time
 
 record_time:
+        .equ CLOCK_MONOTONIC, 1
         mov %rdi, %rsi
-        mov $1, %rdi
+        mov $CLOCK_MONOTONIC, %rdi
         call clock_gettime
         ret
-        
-        .type print_elapsed, function
-        .global print_elapsed
 
-print_elapsed:
+        .section .data
+.stats: .quad 0,0,0,0
+
+
+        .equ SUM, 0
+        .equ SUMSQ, 8
+        .equ MIN, 16
+        .equ COUNT, 24
+
+        .section .text
+        .type mark_time, function
+        .global mark_time
+
+mark_time:
+/* Registers        
+   rdi - pointer to T0 struct
+   rsi - pointer to T1 struct
+        */
+        call calc_elapsed
+        cvtsi2sd %eax, %xmm0
+        movsd .stats+SUM, %xmm1
+        addsd %xmm0, %xmm1
+        movsd %xmm1, .stats+SUM
+        mulsd %xmm0, %xmm0
+        movsd .stats+SUMSQ, %xmm1
+        addsd %xmm0, %xmm1
+        movsd %xmm1, .stats+SUMSQ
+        cmpq .stats+MIN, %rax
+        jle .notmin
+        mov %rax, .stats+MIN
+        .notmin:
+        mov .stats+COUNT, %rax
+        inc %rax
+        mov %rax, .stats+COUNT
+        ret
         
+calc_elapsed:
 /* Registers:
    rdi - pointer to T0 struct
    rsi - pointer to T1 struct
         */
         mov (%rsi), %rax
         sub (%rdi), %rax
-        mov $1000000000, %rcx
+        .equ NS_PER_SEC, 1000000000
+        mov $NS_PER_SEC, %rcx
         mul %rcx
         add 8(%rsi), %rax
         sub 8(%rdi), %rax
-        mov %rax, %rsi
+        ret
+        
+        .type print_elapsed, function
+        .global print_elapsed
+print_elapsed:
+        
+        mov .stats+MIN, %rsi
         mov $outmsg, %rdi
         mov $0, %eax
         call printf
         ret
 
-        .section .rodata
-outmsg: .asciz "Elapsed time: %dns\n"
+outmsg: .asciz "Min elapsed time: %dns\n"

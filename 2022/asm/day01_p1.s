@@ -3,11 +3,8 @@
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
 
-.out_msg: .asciz "Max is %ld\n"
+.out_msg: .asciz "Score 1 is %ld\n"
 
-        .section .data
-max_val: .quad 0
-        
         .section .text
         .global _start
         .type _start, function
@@ -34,12 +31,32 @@ _start:
         call exit
 
 
-        .type save_max, function
-save_max:
-        cmp max_val, %rdi
-        jle .ignore
-        movq %rdi, max_val
-.ignore:
+        .type get_throw,  function
+get_throw:      
+        /* Parameters:
+        %rsi - character
+        %rdi - offset
+        returns - 1=Rock, 2=Paper, 3=Scissors
+        */
+        sub %rdi, %rsi
+        mov %rsi, %rax
+        inc %rax
+        ret
+
+get_score:
+        /* %rsi - their throw
+           %rdi - your throw
+        */
+        cmp %rsi, %rdi
+        je .draw
+        cmp $1, %rdi
+        jne .paper
+        
+        .draw:
+        mov $6, %rax
+        jmp .end
+
+        .end:
         ret
         
         .section .bss
