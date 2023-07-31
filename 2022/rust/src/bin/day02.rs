@@ -85,10 +85,10 @@ fn main() {
 
 fn part2(contents: &str) {
     let mut score: u32 = 0;
-    for line in contents.split("\n") {
+    for line in contents.split('\n') {
         let tokens: Vec<_> = line.split_whitespace().collect();
-        let theirs = normalize(tokens[0].as_bytes()[0], 'A' as u8);
-        let outcome = normalize_to_result(tokens[1].as_bytes()[0], 'X' as u8);
+        let theirs = normalize(tokens[0].as_bytes()[0], b'A');
+        let outcome = normalize_to_result(tokens[1].as_bytes()[0], b'X');
         match outcome {
             Result::Win => score += 6,
             Result::Draw => score += 3,
@@ -106,10 +106,10 @@ fn part2(contents: &str) {
 
 fn part1(contents: &str) {
     let mut score: u32 = 0;
-    for line in contents.split("\n") {
+    for line in contents.split('\n') {
         let tokens: Vec<_> = line.split_whitespace().collect();
-        let theirs = normalize(tokens[0].as_bytes()[0], 'A' as u8);
-        let mine = normalize(tokens[1].as_bytes()[0], 'X' as u8);
+        let theirs = normalize(tokens[0].as_bytes()[0], b'A');
+        let mine = normalize(tokens[1].as_bytes()[0], b'X');
         match round_outcome(&mine, &theirs) {
             Result::Win => score += 6,
             Result::Draw => score += 3,
