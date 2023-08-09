@@ -1,19 +1,25 @@
         .section .rodata
-        .equ FD_STDIN, 0
-        .equ SYS_READ, 0
-        .equ BUFFSIZE, 16000
-.input_err: .asciz "Unable to read input\n"
+.input_err: .asciz "ERROR: Unable to read input\n"
+
+        .section .data
+.t0:    .quad 0,0           
+.t1:    .quad 0,0           
+.stats: .quad 0,0,0,0
+        .equ SUM, 0
+        .equ SUMSQ, 8
+        .equ MIN, 16
+        .equ COUNT, 24
 
         .section .text
-        .type read_file, function
-        .global read_file
-
+        
 /**
-  Read the entire contents of a file into a buffer.
-  Inputs:
+  Read the entire contents of a file into a buffer. Abort if read fails.
     rdi - file descriptor
     rsi - pointer to buffer
+    rdx - size of buffer
 */
+        .type read_file, function
+        .global read_file
 read_file:
         .equ ST_BYTESREAD, -1*8
         .equ STSIZE, 1*8 /* keep this 16-byte aligned when calling C functions */
@@ -21,16 +27,18 @@ read_file:
         mov %rsp, %rbp
         sub $STSIZE, %rsp
 
+        .equ SYS_READ, 0
         mov $SYS_READ, %rax
-        mov $BUFFSIZE, %rdx
         syscall
         mov %rax, ST_BYTESREAD(%rbp)
 
         cmp $0, %rax
         jg .read_success
-        mov $.input_err, %rdi
+        .equ FD_STDERR, 1
+        mov $FD_STDERR, %rdi
+        mov $.input_err, %rsi
         mov $0, %rax
-        call printf
+        call fprintf
         mov $1, %rax
         call exit
 
@@ -40,99 +48,63 @@ read_file:
         pop %rbp
         ret
 
-        .type parse_file, function
-        .global parse_file
-/**
-  Parse a file of numbers delimited by newlines
-  with groups of numbers separated by blank lines.
-  Call back the supplied function with the sum of each
-  group of numbers
-Inputs: 
-        rdi - input pointer
-        rsi - end-of-input pointer
-        rdx - callback function
-*/
-parse_file:
         
+/**
+  Call a function in a loop to time it repteatedly, and print out its performance
+   rdi - callback function
+   rsi - number of times to loop
+*/
+        .type perf_timer, function
+        .global perf_timer
+perf_timer:     
         push %rbp
         mov %rsp, %rbp
-        push %rbx
-        .equ STSIZE, 16
-        .equ ST_CALLBACK, -16
-        sub $STSIZE, %rsp
-        mov %rdx, ST_CALLBACK(%rbp)
-/* Registers:
-   rax - atoi accumulator
-   rbx - byte read (in rl)
-   rcx - batch accumulator
-*/
-.newbatch:                      
-        xor %rcx, %rcx
-.newline:
-        xor %rax, %rax
-.byte_parse_loop:
-        cmp %rdi, %rsi
-        je .eof
-        xor %rbx, %rbx
-        movb (%rdi), %bl
-        add $1, %rdi
-        cmpb $'\n', %bl
-        je .eol
-        mov $10, %r8
-        mull %r8d
-        sub $'0', %bl
-        add %rbx, %rax
-        jmp .byte_parse_loop
-.eol:
-        cmp $0, %rax
-        je .savebatch
-        add %rax, %rcx
-        jmp .newline
-.savebatch:       
         push %rdi
         push %rsi
-        mov %rcx, %rdi
-        mov ST_CALLBACK(%rbp), %rdx
-        call *%rdx
+        push %rsi /* for stack alignment */
+        .equ ST_FUNCTION, -1*8
+        .equ ST_COUNTER, -2*8
+        .equ CLOCK_MONOTONIC, 1
+        
+ .l0:   mov ST_COUNTER(%rbp), %r15   /* loop counter to decrement */
+        cmp $0, %r15
+        je .l0d
+
+        mov $CLOCK_MONOTONIC, %rdi
+        mov $.t0, %rsi
+        call clock_gettime
+
+        call * ST_FUNCTION(%rbp)
+
+        mov $CLOCK_MONOTONIC, %rdi
+        mov $.t1, %rsi
+        call clock_gettime
+
+        mov $.t0, %rdi
+        mov $.t1, %rsi
+        call mark_time
+
+        mov ST_COUNTER(%rbp), %rax
+        dec %rax
+        mov %rax, ST_COUNTER(%rbp)
+        jmp .l0
+.l0d:        
+        call print_stats
+
+        pop %rsi
         pop %rsi
         pop %rdi
-        jmp .newbatch
-        
-.eof:
-        
-        add $STSIZE, %rsp
-        pop %rbx
         pop %rbp
         ret
+        
 
-        .type record_time, function
-        .global record_time
-
-record_time:
-        .equ CLOCK_MONOTONIC, 1
-        mov %rdi, %rsi
-        mov $CLOCK_MONOTONIC, %rdi
-        call clock_gettime
-        ret
-
-        .section .data
-.stats: .quad 0,0,0,0
-
-
-        .equ SUM, 0
-        .equ SUMSQ, 8
-        .equ MIN, 16
-        .equ COUNT, 24
-
-        .section .text
-        .type mark_time, function
-        .global mark_time
-
-mark_time:
-/* Registers        
+/** 
+  Calculate elapsed time and update statistics
    rdi - pointer to T0 struct
    rsi - pointer to T1 struct
-        */
+*/
+        .type mark_time, function
+mark_time:
         call calc_elapsed
         cvtsi2sd %eax, %xmm0
         movsd .stats+SUM, %xmm1
@@ -150,29 +122,43 @@ mark_time:
         inc %rax
         mov %rax, .stats+COUNT
         ret
-        
+
+
+/**
+  Calculate the elapsed time between to timer points in nanoseconds
+    rdi - pointer to T0 struct
+    rsi - pointer to T1 struct
+*/
+        .type calc_elapsed, function
 calc_elapsed:
-/* Registers:
-   rdi - pointer to T0 struct
-   rsi - pointer to T1 struct
-        */
-        mov (%rsi), %rax
-        sub (%rdi), %rax
+        mov (%rsi), %rax 
+        sub (%rdi), %rax /* subtract the seconds part */
         .equ NS_PER_SEC, 1000000000
         mov $NS_PER_SEC, %rcx
         mul %rcx
+        /* now offset by the nanoseconds */
         add 8(%rsi), %rax
         sub 8(%rdi), %rax
         ret
         
-        .type print_elapsed, function
-        .global print_elapsed
-print_elapsed:
+        .type print_stats, function
+print_stats:
         
-        mov .stats+MIN, %rsi
         mov $outmsg, %rdi
-        mov $0, %eax
+        mov .stats+MIN, %rsi
+        movsd .stats+SUM, %xmm0
+        mov .stats+COUNT, %rax
+        cvtsi2sd %rax, %xmm3
+        divsd %xmm3, %xmm0 /* xmm0 has average */
+        movsd .stats+SUMSQ, %xmm1
+        divsd %xmm3, %xmm1 /* xmm1 has sumsq/N */
+        movsd %xmm0, %xmm3
+        mulsd %xmm0, %xmm3 /* xmm3 - avg*avg */
+        subsd %xmm3, %xmm1 /* xmm2 - Var = sumsq/N - avg^2 */
+        sqrtsd %xmm1, %xmm1       /* xmm2 - stddev = sqrt(Var) */
+        mov $0, %rax
         call printf
         ret
 
-outmsg: .asciz "Min elapsed time: %dns\n"
+        .section .rodata
+outmsg: .asciz "Elapsed time- min: %dns, avg: %.0f, stddev: %.0f\n"
