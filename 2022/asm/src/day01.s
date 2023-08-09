@@ -2,7 +2,7 @@
         .section .rodata
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
-        .equ N_COUNT, 1000
+        .equ N_COUNT, 10000
 
         .section .bss
         .lcomm in_buffer, BUFFSIZE
