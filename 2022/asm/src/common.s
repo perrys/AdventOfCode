@@ -4,7 +4,7 @@
         .section .data
 .t0:    .quad 0,0           
 .t1:    .quad 0,0           
-.stats: .quad 0,0,0,0xffffffff
+.stats: .quad 0,0,0,0
         .equ SUM, 0
         .equ SUMSQ, 8
         .equ COUNT, 16
@@ -65,6 +65,12 @@ perf_timer:
         .equ ST_FUNCTION, -1*8
         .equ ST_COUNTER, -2*8
         .equ CLOCK_MONOTONIC, 1
+        mov $0, %rax
+        mov %rax, .stats+SUM
+        mov %rax, .stats+SUMSQ
+        mov %rax, .stats+COUNT
+        mov $0xffffffffffffffff, %rax
+        mov %rax, .stats+MIN
         
  .l0:   mov ST_COUNTER(%rbp), %r15   /* loop counter to decrement */
         cmp $0, %r15
