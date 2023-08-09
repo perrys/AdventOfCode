@@ -4,11 +4,11 @@
         .section .data
 .t0:    .quad 0,0           
 .t1:    .quad 0,0           
-.stats: .quad 0,0,0,0
+.stats: .quad 0,0,0,0xffffffff
         .equ SUM, 0
         .equ SUMSQ, 8
-        .equ MIN, 16
-        .equ COUNT, 24
+        .equ COUNT, 16
+        .equ MIN, 24
 
         .section .text
         
@@ -115,7 +115,7 @@ mark_time:
         addsd %xmm0, %xmm1
         movsd %xmm1, .stats+SUMSQ
         cmpq .stats+MIN, %rax
-        jle .notmin
+        jae .notmin
         mov %rax, .stats+MIN
         .notmin:
         mov .stats+COUNT, %rax
