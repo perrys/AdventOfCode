@@ -3,7 +3,7 @@ AS=as
 TARGET=../target
 BUILD=$(TARGET)/build
 
-SRCS = day01_p1.s # day01_p2.s
+SRCS = day01.s # day01_p2.s
 BINS = $(SRCS:%.s=%)
 TARGETS = $(BINS:%=$(TARGET)/%)
 
@@ -16,8 +16,8 @@ debug_print:
 $(TARGET) $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/%.o : %.s
+$(BUILD)/%.o : %.s $(BUILD) 
 	$(AS) -g $< -o $@
 
-$(TARGET)/day01_% : $(BUILD)/day01_%.o $(BUILD)/common.o $(BUILD) 
+$(TARGET)/day01 : $(BUILD)/day01.o $(BUILD)/common.o
 	ld -dynamic-linker /lib64/ld-linux-x86-64.so.2  -o $@ $< $(BUILD)/common.o  -lc
