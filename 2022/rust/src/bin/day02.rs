@@ -1,3 +1,4 @@
+use aoc2022::timer;
 use std::fs;
 
 #[derive(PartialEq, Clone)]
@@ -62,7 +63,7 @@ fn normalize_to_result(outcome: u8, offset: u8) -> Result {
         _ => panic!("Unexpected outcome symbol {outcome}"),
     }
 }
-fn normalize(throw: u8, offset: u8) -> Throw {
+fn normalize_to_throw(throw: u8, offset: u8) -> Throw {
     match throw - offset {
         0 => Throw::Rock,
         1 => Throw::Paper,
@@ -79,47 +80,50 @@ fn main() {
     }
     let filename = &args[1];
     let contents = fs::read_to_string(filename).expect("Couldn't read file {filename}");
-    part1(&contents);
-    part2(&contents);
-}
+    let mut part1_result: u32 = 0;
+    let mut part2_result: u32 = 0;
+    let part1 = || {
+        let mut score: u32 = 0;
+        for line in contents.split('\n') {
+            let tokens: Vec<_> = line.split_whitespace().collect();
+            let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
+            let mine = normalize_to_throw(tokens[1].as_bytes()[0], b'X');
+            match round_outcome(&mine, &theirs) {
+                Result::Win => score += 6,
+                Result::Draw => score += 3,
+                Result::Lose => {}
+            }
+            match mine {
+                Throw::Rock => score += 1,
+                Throw::Paper => score += 2,
+                Throw::Sciscors => score += 3,
+            }
+        }
+        part1_result = score;
+    };
+    timer(part1);
+    println!("Part 1 score is {part1_result}");
 
-fn part2(contents: &str) {
-    let mut score: u32 = 0;
-    for line in contents.split('\n') {
-        let tokens: Vec<_> = line.split_whitespace().collect();
-        let theirs = normalize(tokens[0].as_bytes()[0], b'A');
-        let outcome = normalize_to_result(tokens[1].as_bytes()[0], b'X');
-        match outcome {
-            Result::Win => score += 6,
-            Result::Draw => score += 3,
-            Result::Lose => {}
+    let part2 = || {
+        let mut score: u32 = 0;
+        for line in contents.split('\n') {
+            let tokens: Vec<_> = line.split_whitespace().collect();
+            let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
+            let outcome = normalize_to_result(tokens[1].as_bytes()[0], b'X');
+            match outcome {
+                Result::Win => score += 6,
+                Result::Draw => score += 3,
+                Result::Lose => {}
+            }
+            let mine = get_required_throw(&theirs, &outcome);
+            match mine {
+                Throw::Rock => score += 1,
+                Throw::Paper => score += 2,
+                Throw::Sciscors => score += 3,
+            }
         }
-        let mine = get_required_throw(&theirs, &outcome);
-        match mine {
-            Throw::Rock => score += 1,
-            Throw::Paper => score += 2,
-            Throw::Sciscors => score += 3,
-        }
-    }
-    println!("Part 2 score is {score}");
-}
-
-fn part1(contents: &str) {
-    let mut score: u32 = 0;
-    for line in contents.split('\n') {
-        let tokens: Vec<_> = line.split_whitespace().collect();
-        let theirs = normalize(tokens[0].as_bytes()[0], b'A');
-        let mine = normalize(tokens[1].as_bytes()[0], b'X');
-        match round_outcome(&mine, &theirs) {
-            Result::Win => score += 6,
-            Result::Draw => score += 3,
-            Result::Lose => {}
-        }
-        match mine {
-            Throw::Rock => score += 1,
-            Throw::Paper => score += 2,
-            Throw::Sciscors => score += 3,
-        }
-    }
-    println!("Part 1 score is {score}");
+        part2_result = score;
+    };
+    timer(part2);
+    println!("Part 2 score is {part2_result}");
 }
