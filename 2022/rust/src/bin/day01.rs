@@ -48,7 +48,7 @@ fn main() {
 }
 
 fn timer<F: FnMut()>(mut func: F) {
-    const N_ITERS: u32 = 1000;
+    const N_ITERS: u32 = 10000;
     let mut sum: u128 = 0;
     let mut sumsq: u128 = 0;
     let mut opt_min_dur: Option<u128> = None;
@@ -70,7 +70,7 @@ fn timer<F: FnMut()>(mut func: F) {
     let avg = sum as f64 / (N_ITERS as f64);
     let stddev = ((sumsq as f64 / (N_ITERS as f64)) - (avg * avg)).sqrt();
     let min_time = opt_min_dur.unwrap();
-    println!("Min time was {min_time:}ns, avg = {avg:.0}+/-{stddev:.0}");
+    println!("Elapsed time - min: {min_time:}ns, avg: {avg:.0}, stddev: {stddev:.0}");
 }
 
 fn parse_file<F: FnMut(u32)>(contents: &str, mut cb: F) {
