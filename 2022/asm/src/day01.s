@@ -39,7 +39,6 @@ _start:
         mov $part1, %rdi
         mov $N_COUNT, %rsi
         call perf_timer
-//        call part1 
         mov $max_fmtstr, %rdi
         mov vals_array, %rsi
         mov $0, %rax
@@ -52,8 +51,7 @@ _start:
         mov %rax, vals_array+16
         mov $part2, %rdi
         mov $N_COUNT, %rsi
-//        call perf_timer
-        call part2
+        call perf_timer
         mov $vals_array, %rbx
         mov $0, %rsi
         mov $0, %rdi
