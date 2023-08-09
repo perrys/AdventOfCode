@@ -156,7 +156,7 @@ print_stats:
         mulsd %xmm0, %xmm3 /* xmm3 - avg*avg */
         subsd %xmm3, %xmm1 /* xmm2 - Var = sumsq/N - avg^2 */
         sqrtsd %xmm1, %xmm1       /* xmm2 - stddev = sqrt(Var) */
-        mov $0, %rax
+        mov $2, %rax
         call printf
         ret
 
