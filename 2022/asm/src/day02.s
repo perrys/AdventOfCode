@@ -2,10 +2,16 @@
         .section .rodata
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
+        .equ N_COUNT, 10000
 
-.part1_msg: .asciz "Part 1 score is %ld\n"
-.part2_msg: .asciz "Part 2 score is %ld\n"
-.invalid_file_msg: .asciz "ERROR: data file invalid - should be multiple of 4 bytes long"
+part1_msg: .asciz "Part 1 score is %ld\n"
+part2_msg: .asciz "Part 2 score is %ld\n"
+invalid_file_msg: .asciz "ERROR: data file invalid - should be multiple of 4 bytes long"
+
+        .section .data
+end_of_buffer:  .quad 0
+processor_func:  .quad 0
+score:  .quad 0
 
         .section .text
         .global _start
@@ -20,27 +26,37 @@ _start:
         mov $FD_STDIN, %rdi
         mov $in_buffer, %rsi
         call read_file
-        mov %rax, BYTES_READ(%rbp)
+        mov %rax, %rsi /* number of bytes read */
+        add $in_buffer, %rsi
+        mov %rsi, end_of_buffer
+        and $0b11, %rax /* file length must be a multiple of 4 */
+        jz .validated
+        mov $invalid_file_msg, %rdi 
+        mov $0, %rax
+        call printf
+        mov $1, %rdi
+        call exit
+.validated:        
         
-        mov $in_buffer, %rdi /* start of buffer */
-        mov %rax, %rsi
-        add %rdi, %rsi       /* end of buffer */
-        mov $part1, %rdx
-        call parse_file
+        mov $part1, %rax
+        mov %rax, processor_func
+        mov $parse_file, %rdi
+        mov $N_COUNT, %rsi
+        call perf_timer
         
-        mov $.part1_msg, %rdi
-        mov %rax, %rsi
+        mov $part1_msg, %rdi
+        mov score, %rsi
         mov $0, %rax
         call printf
 
-        mov $in_buffer, %rdi /* start of buffer */
-        mov BYTES_READ(%rbp), %rsi
-        add %rdi, %rsi       /* end of buffer */
-        mov $part2, %rdx
-        call parse_file
+        mov $part2, %rax
+        mov %rax, processor_func
+        mov $parse_file, %rdi
+        mov $N_COUNT, %rsi
+        call perf_timer
         
-        mov $.part2_msg, %rdi
-        mov %rax, %rsi
+        mov $part2_msg, %rdi
+        mov score, %rsi
         mov $0, %rax
         call printf
 
@@ -50,33 +66,20 @@ _start:
 /**
  Parse the data file. Each line must be of the form "A X\n"
  where A and X are characters.
-        %rdi - input data start addr
-        %rsi end addr
-        %rdx - score calculation function pointer      
  Returns the final score
 */
         .type parse_file, function
-parse_file:     
+parse_file:
         push %rbp
         mov %rsp, %rbp
         push %r12
         push %r13
         push %r14
         push %r15
-        mov %rdx, %r12 /* r12 = function ptr */
-        mov %rdi, %r13 /* r13 = current datum ptr */
-        mov %rsi, %r14 /* r14 = eof ptr */
+        mov processor_func, %r12 /* r12 = function ptr */
+        mov $in_buffer, %r13 /* r13 = current datum ptr */
+        mov end_of_buffer, %r14 /* r14 = eof ptr */
         xor %r15, %r15 /* r15 = points total */
-        sub %rdi, %rsi
-        and $0b11, %rsi
-        jz .validated
-        mov $.invalid_file_msg, %rdi 
-        mov $0, %rax
-        call printf
-        mov $1, %rdi
-        call exit
-.validated:        
-        
 .newline:
         xor %rdi, %rdi
         xor %rsi, %rsi
@@ -89,7 +92,7 @@ parse_file:
         je .eof
         jmp .newline
 .eof:
-        mov %r15, %rax
+        mov %r15, score
         pop %r15
         pop %r14
         pop %r13
@@ -221,22 +224,32 @@ get_my_throw:
 */
         .type get_result, function
 get_result:     
+        /* so each throw beats the one directly below it in the
+        scoring hierarchy (i.e. paper beats rock, sciscors
+        beats paper, except in the rock vs sciscors case where it
+        wraps around */
         sub %rsi, %rdi /* %rdi = mine - theirs */
+/* it is faster to omit this early exit in the case of a draw; this 
+   is almost certainly due to the branch causing pipeline stalls */
+/*        
         jnz .notdraw
         mov %rdi, %rax
         ret
 .notdraw:
+*/
+        /* so rdi has the correct result except for R vs S (it is -2, should be 1)
+        and S vs R (it is 2, should be -1). So first check if abs(rdi) is 2 */
         push %rdi
         call abs /* rax = abs(rdi) */
         pop %rdi
-        shr $1, %rax   /* rax = 1 if abs(result) was 2, 0 otherwise */
-        mov %rax, %rcx
-        sar %cl, %rdi /* divide by 2 if rax is 1 */
-        mov %rax, %rsi /* now multiply by -1 if rax is 1, using 2's complement */
-        shl $63, %rsi  /* make rsi all 1s if.. */
-        sar $63, %rsi  /* rax is 1, all 0s otherwise */
-        xor %rsi, %rdi /* one's complement if rax is 1 */
-        add %rdi, %rax /* then adjust to two's complement */
+        shr $1, %rax   /* rax is now 1 if abs(result) was 2, 0 otherwise */
+        mov %rax, %rcx /* so it is a boolean for the wraparound case  */
+        sar %cl, %rdi  /* divide by 2 for the wraparound case */
+        mov %rax, %rsi /* now multiply by -1 for wraparound (using 2's complement).. */
+        shl $63, %rsi  /* these two shifts fill rsi with 1s in the wraparound.. */
+        sar $63, %rsi  /* ..case, or with 0s otherwise */
+        xor %rsi, %rdi /* one's complement when wraparound, nop otherwise */
+        add %rdi, %rax /* then adjust to two's complement when wraparound */
         ret
 
 /**
