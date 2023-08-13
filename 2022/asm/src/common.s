@@ -13,6 +13,21 @@
         .section .text
         
 /**
+  Return the absolute value of a (signed) 64-bit integer
+  using abs(x) = (x XOR y) - y, where y = x >> 63
+    %rdi - the value
+*/
+        .type abs, function
+        .global abs
+abs:
+        mov %rdi, %rsi /* rdi = x, rsi will be y */
+        sar $63, %rsi   /* y = all 1s if rdi was negative, all zeros if positive */
+        xor %rsi, %rdi /* let rdi = rdi xor rsi */
+        sub %rsi, %rdi /* let rdi = rdi - rsi */
+        mov %rdi, %rax
+        ret
+
+/**
   Read the entire contents of a file into a buffer. Abort if read fails.
     rdi - file descriptor
     rsi - pointer to buffer
