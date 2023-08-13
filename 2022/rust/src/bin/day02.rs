@@ -86,6 +86,9 @@ fn main() {
         let mut score: u32 = 0;
         for line in contents.split('\n') {
             let tokens: Vec<_> = line.split_whitespace().collect();
+            if 0 == tokens.len() {
+                break;
+            }
             let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
             let mine = normalize_to_throw(tokens[1].as_bytes()[0], b'X');
             match round_outcome(&mine, &theirs) {
@@ -108,6 +111,9 @@ fn main() {
         let mut score: u32 = 0;
         for line in contents.split('\n') {
             let tokens: Vec<_> = line.split_whitespace().collect();
+            if 0 == tokens.len() {
+                break;
+            }
             let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
             let outcome = normalize_to_result(tokens[1].as_bytes()[0], b'X');
             match outcome {
