@@ -86,7 +86,7 @@ fn main() {
         let mut score: u32 = 0;
         for line in contents.split('\n') {
             let tokens: Vec<_> = line.split_whitespace().collect();
-            if 0 == tokens.len() {
+            if tokens.is_empty() {
                 break;
             }
             let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
@@ -111,7 +111,7 @@ fn main() {
         let mut score: u32 = 0;
         for line in contents.split('\n') {
             let tokens: Vec<_> = line.split_whitespace().collect();
-            if 0 == tokens.len() {
+            if tokens.is_empty() {
                 break;
             }
             let theirs = normalize_to_throw(tokens[0].as_bytes()[0], b'A');
