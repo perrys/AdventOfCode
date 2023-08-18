@@ -3,7 +3,7 @@ AS=as
 TARGET=../target
 BUILD=$(TARGET)/build
 
-SRCS = day01.s day02.s
+SRCS = day01.s day02.s day03.s
 BINS = $(SRCS:%.s=%)
 TARGETS = $(BINS:%=$(TARGET)/%)
 
