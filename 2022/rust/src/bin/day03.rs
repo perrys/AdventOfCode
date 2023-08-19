@@ -9,6 +9,22 @@ fn get_priority(ch: u8) -> u8 {
     }
 }
 
+fn get_mask(ch: u8) -> u64 {
+    let position = ch % 64;
+    1 << position
+}
+
+fn get_mask_for_slice<'a, I>(iter: I) -> u64
+where
+    I: std::iter::Iterator<Item = &'a u8>,
+{
+    let mut mask: u64 = 0;
+    for ch in iter {
+        mask |= get_mask(*ch);
+    }
+    mask
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -26,21 +42,14 @@ fn main() {
             }
             // the range of ascii from 'A' to 'z' is (65 to 122)
             // so presence can be recorded in a 64-length bitvector
-            let mut mask: u64 = 0;
             let lineb = line.as_bytes();
-            for idx in 0..lineb.len() / 2 {
-                let ch = lineb[idx];
-                let position = ch % 64;
-                let flag = 1 << position;
-                mask |= flag;
-            }
+            let mask: u64 = get_mask_for_slice(lineb.iter().take(lineb.len() / 2));
             let mut done = false;
-            for idx in line.len() / 2..line.len() {
-                let ch = lineb[idx];
+            for ch in lineb.iter().take(lineb.len()).skip(line.len() / 2) {
                 let position = ch % 64;
                 let flag = 1 << position;
                 if mask & flag > 0 {
-                    let pri = get_priority(ch);
+                    let pri = get_priority(*ch);
                     score += pri as u32;
                     done = true;
                     break;
@@ -54,4 +63,39 @@ fn main() {
     };
     timer(part1);
     println!("Part 1 score is {part1_result}");
+
+    let mut lookup_table: [char; 64] = ['\0'; 64];
+    for ch in 'A'..='z' {
+        let m = ch as u8 & 63;
+        lookup_table[m as usize] = ch;
+    }
+    let get_char = |m: u64| {
+        let position = m.trailing_zeros() as usize;
+        lookup_table[position]
+    };
+
+    let mut part2_result: u32 = 0;
+    let part2 = || {
+        let mut score: u32 = 0;
+        let lines: Vec<&str> = contents.split('\n').collect();
+        for idx in (0..lines.len()).step_by(3) {
+            if lines[idx].is_empty() {
+                break;
+            }
+            let chunk = [lines[idx], lines[idx + 1], lines[idx + 2]];
+            let masks = chunk
+                .iter()
+                .map(|s| get_mask_for_slice(s.as_bytes().iter()));
+            let mut mask: u64 = u64::MAX;
+            for m in masks {
+                mask &= m;
+            }
+            let ch = get_char(mask);
+            let pri = get_priority(ch as u8) as u32;
+            score += pri;
+        }
+        part2_result = score;
+    };
+    timer(part2);
+    println!("Part 2 score is {part2_result}");
 }
