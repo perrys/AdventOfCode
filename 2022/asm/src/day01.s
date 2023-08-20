@@ -12,6 +12,9 @@ bytes_read: .quad 0
 vals_array: .quad 0, 0, 0
 max_fmtstr: .asciz "Max is: %ld\n"
 top3_fmtstr: .asciz "Top 3 sum to: %ld\n"
+        .equ IDX_0, 0
+        .equ IDX_1, 8
+        .equ IDX_2, 16
         
         .section .text
 
@@ -45,10 +48,6 @@ _start:
         call printf
         
         /* part 2 */
-        mov $0, %rax
-        mov %rax, vals_array
-        mov %rax, vals_array+8
-        mov %rax, vals_array+16
         mov $part2, %rdi
         mov $N_COUNT, %rsi
         call perf_timer
@@ -85,10 +84,14 @@ part1:
 */
         .type part2, function
 part2:
-        mov $in_buffer, %rdi /* start of buffer */
+        mov $vals_array, %rdx   # Zero the array for each run
+        movq $0, IDX_0(%rdx)
+        movq $0, IDX_1(%rdx)
+        movq $0, IDX_2(%rdx)
+        mov $in_buffer, %rdi    # start of buffer
         mov $in_buffer, %rsi
-        add bytes_read, %rsi /* end of buffer */
-        mov $top3, %rdx      /* function pointer */
+        add bytes_read, %rsi    # end of buffer
+        mov $top3, %rdx         # function pointer 
         call parse_file
         ret
         
@@ -177,9 +180,6 @@ top3:
         push %rbp
         mov %rsp, %rbp
         mov $vals_array, %rdx /* pointer to the 3-array */
-        .equ IDX_0, 0
-        .equ IDX_1, 8
-        .equ IDX_2, 16
         /* sort array */
         cmp IDX_0(%rdx), %rdi 
         jle .done
