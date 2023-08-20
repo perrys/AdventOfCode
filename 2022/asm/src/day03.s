@@ -40,75 +40,47 @@ _start:
 part1:
         push %rbp
         mov %rsp, %rbp
-        xor %r11, %r11          # score
-        mov $in_buffer, %r10    # buffer ptr 
-        xor %rsi, %rsi          # line counter
+        xor %r15, %r15          # score
+        mov $in_buffer, %r14    # buffer ptr 
+        xor %r13, %r13          # line counter
 p1_newline:
-        cmp %rsi, num_lines
+        cmp %r13, num_lines
         je p1_done
-        mov line_endings(,%rsi,8), %rdx  # end-of-line ptr
-        sub %r10, %rdx                # num characters on this line
-        shr $1, %rdx                  # half num chars 
-p1_first_half:
-        xor %rdi, %rdi                # line index
-        xor %r8, %r8                  # item mask
-        xor %rcx, %rcx                # byte holder
-p1_first_loop:                      
-        cmp %rdx, %rdi
-        je p1_second_half
-        movb (%r10, %rdi), %cl  #read byte 
-        inc %rdi
-        andb $63, %cl           # cl = cl mod 64
-        mov $1, %rax
-        shl %cl, %rax           # shift to place in bit vector
-        or %rax, %r8            # set bit in bit vector
-        jmp p1_first_loop
-p1_second_half:
-        add %rdi, %r10          # move buffer to second half of line
+        mov line_endings(,%r13,8), %r12  # end-of-line ptr
+        sub %r14, %r12                   # num characters on this line
+        shr $1, %r12                     # half num chars 
+        mov %r14, %rdi
+        mov %r12, %rsi
+        call get_mask_for_slice
+        mov %rax, %rbx
+        add %r12, %r14          # move buffer to second half of line
         xor %rdi, %rdi          # reset line index
-p1_second_loop:
-        cmp %rdi, %rdx
+p1_second_half_loop:
+        cmp %rdi, %r12
         je p1_notfound
-        movb (%r10, %rdi), %cl  # read byte 
+        movb (%r14, %rdi), %cl  # read byte 
         inc %rdi
         xor %r9, %r9
         movb %cl, %r9b          # copy of byte read
-        andb $63, %cl
-        mov $1, %rax
-        shl %cl, %rax
-        and %r8, %rax
-        jz p1_second_loop
-        add %rdx, %r10          # found it!. now move buffer to second half of line 
-        inc %r10                # skip newline
+        call get_mask_for_char
+        and %rbx, %rax          # test if this item is already present in the mask
+        jz p1_second_half_loop  # if not, loop again
+        add %r12, %r14          # found it! Now move buffer to next line
+        inc %r14                # skip newline
         mov %r9, %rdi
         call get_priority
-        add %rax, %r11           # add to score
-        push %rdi
-        push %rsi
-        push %rdx
-        push %rcx
-        push %r10
-        push %r11
-        mov $dbg_msg, %rdi
-        mov %r9, %rdx
-        mov %rax, %rcx
-        call printf
-        pop %r11
-        pop %r10
-        pop %rcx
-        pop %rdx
-        pop %rsi
-        pop %rdi
-        inc %rsi
+        add %rax, %r15           # add to score
+        inc %r13
         jmp p1_newline
 p1_notfound:
-        mov $notfound_errmsg, %rdi # rsi is already set to line count
+        mov $notfound_errmsg, %rdi
+        mov %r13, %rsi
         mov $0, %rax
         call printf
         mov $1, %rdi
         call exit
 p1_done:
-        mov %r11, %rax
+        mov %r15, %rax
         pop %rbp
         ret
 
@@ -116,6 +88,35 @@ p1_done:
 dbg_msg:        .asciz "[%d] %c - %d\n"
         .section .text
         
+### Calculate the bitmask for the given line of items
+###  %rdi - pointer to line
+###  %rsi - number of items to read
+### Returns the 64bit mask in %rax
+        .type get_mask_for_slice, function
+get_mask_for_slice:
+        add %rdi, %rsi          # rsi is now pointer to last byte
+        xor %rdx, %rdx          # zero the result
+mask_loop:                      
+        cmp %rsi, %rdi
+        je mask_done
+        movb (%rdi), %cl        # read byte
+        inc %rdi
+        call get_mask_for_char
+        or %rax, %rdx           # set bit in bit vector
+        jmp mask_loop
+mask_done:
+        mov %rdx, %rax
+        ret
+        
+### Calculate the 64-bit mask for a single character
+###  %cl - byte register should contain the character
+### Returns the 64-bit mask in %rax
+        .type get_mask_for_char, function
+get_mask_for_char:
+        andb $63, %cl           # cl = cl mod 64
+        mov $1, %rax
+        shl %cl, %rax           # shift to place in bit vector
+        ret
         
         
 ### Get the score (aka prioirty) for this item code
