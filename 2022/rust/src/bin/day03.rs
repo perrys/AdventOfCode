@@ -64,18 +64,18 @@ fn main() {
     timer(part1);
     println!("Part 1 score is {part1_result}");
 
-    let mut lookup_table: [char; 64] = ['\0'; 64];
-    for ch in 'A'..='z' {
-        let m = ch as u8 & 63;
-        lookup_table[m as usize] = ch;
-    }
-    let get_char = |m: u64| {
-        let position = m.trailing_zeros() as usize;
-        lookup_table[position]
-    };
-
     let mut part2_result: u32 = 0;
     let part2 = || {
+        let mut lookup_table: [char; 64] = ['\0'; 64];
+        for ch in 'A'..='z' {
+            let m = ch as u8 & 63;
+            lookup_table[m as usize] = ch;
+        }
+        let get_char = |m: u64| {
+            let position = m.trailing_zeros() as usize;
+            lookup_table[position]
+        };
+
         let mut score: u32 = 0;
         let lines: Vec<&str> = contents.split('\n').collect();
         for idx in (0..lines.len()).step_by(3) {
