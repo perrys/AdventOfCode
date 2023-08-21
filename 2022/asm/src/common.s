@@ -72,14 +72,18 @@ read_file:
         .type perf_timer, function
         .global perf_timer
 perf_timer:     
-        push %rbp
-        mov %rsp, %rbp
-        push %rdi
-        push %rsi
-        push %rsi /* for stack alignment */
+        .equ ST_SIZE, 2*8
         .equ ST_FUNCTION, -1*8
         .equ ST_COUNTER, -2*8
         .equ CLOCK_MONOTONIC, 1
+        push %rbp
+        mov %rsp, %rbp
+        push %r15
+        push %r14
+        push %r13
+        sub $ST_SIZE, %rsp
+        mov %rdi, ST_FUNCTION(%rbp)
+        mov %rsi, ST_COUNTER(%rbp)
         mov $0, %rax
         mov %rax, .stats+SUM
         mov %rax, .stats+SUMSQ
@@ -96,6 +100,7 @@ perf_timer:
         call clock_gettime
 
         call * ST_FUNCTION(%rbp)
+        mov %rax, %r14
 
         mov $CLOCK_MONOTONIC, %rdi
         mov $.t1, %rsi
@@ -112,9 +117,11 @@ perf_timer:
 .l0d:        
         call print_stats
 
-        pop %rsi
-        pop %rsi
-        pop %rdi
+        mov %r14, %rax
+        add $ST_SIZE, %rsp
+        pop %r13
+        pop %r14
+        pop %r15
         pop %rbp
         ret
         
