@@ -149,7 +149,7 @@ p2_init_done:
         mov $in_buffer, %r14    # buffer ptr 
         xor %r13, %r13          # line counter
 p2_nextgroup:
-        xor %rbx, %rbx                 # 3-group counter
+        xor %rbx, %rbx                # 3-group counter
         mov $0xFFFFFFFFFFFFFFFF, %r11 # 3-group mask
 p2_newline:
         cmp $3, %rbx
@@ -196,7 +196,10 @@ mask_loop:
         je mask_done
         movb (%rdi), %cl        # read byte
         inc %rdi
-        call get_mask_for_char
+        ## get_mask_for_char inlined here as it doubles the performance!
+        andb $63, %cl           # cl = cl mod 64
+        mov $1, %rax
+        shl %cl, %rax           # shift to place in bit vector
         or %rax, %rdx           # set bit in bit vector
         jmp mask_loop
 mask_done:
