@@ -1,44 +1,75 @@
 
-        .section .rodata
         .equ FD_STDIN, 0
         .equ BUFFSIZE, 16000
         .equ LINE_END_SIZE, 400*8
-out_msg: .asciz "Score 1 is %ld\n"
+        .equ N_COUNT, 10000
+
+###
+### Read only data
+### 
+        .section .rodata
+p1_out_msg: .asciz "Score 1 is %ld\n"
+p2_out_msg: .asciz "Score 2 is %ld\n"
+dbg_msg: .asciz "[%d] %c - %d\n"
 notfound_errmsg: .asciz "ERROR: no duplicate found on line %d\n"
 
+###
+### Initialized Data
+### 
         .section .data
 end_of_file:    .quad 0
 num_lines:      .quad 0
         
+###
+### Uninitialized Data
+### 
+        .section .bss
+        .lcomm in_buffer, BUFFSIZE
+        .lcomm line_endings, LINE_END_SIZE
+        .lcomm lookup_table, 64
+        
+###
+### Code Section
+### 
         .section .text
 
         .global _start
         .type _start, function
 _start:
-        .equ STSIZE, 2*8 
         mov %rsp, %rbp
-        sub $STSIZE, %rsp
         mov $FD_STDIN, %rdi
         mov $in_buffer, %rsi
-        call read_file
+        call read_file          # read the input file contents
         add $in_buffer, %rax
         mov %rax, end_of_file
-        
-        call get_line_endings
-        call part1      
-
-        mov $out_msg, %rdi
+        call get_line_endings   # Initialize line endings table
+        mov $part1, %rdi        # now time part 1
+        mov $N_COUNT, %rsi
+        call perf_timer
+        mov $p1_out_msg, %rdi
         mov %rax, %rsi
         mov $0, %rax
         call printf
-        add $STSIZE, %rsp
+        mov $part2, %rdi        # now time part 2
+        mov $N_COUNT, %rsi
+        call perf_timer
+        mov $p2_out_msg, %rdi
+        mov %rax, %rsi
+        mov $0, %rax
+        call printf
         mov $0, %edi
         call exit
 
-### Parse the buffer one line at a time
+### Find the common item in two halves of each line
+### Returns the total score in %rax
         .type part1, function
 part1:
         push %rbp
+        push %r15
+        push %r14
+        push %r13
+        push %r12
+        push %rbx
         mov %rsp, %rbp
         xor %r15, %r15          # score
         mov $in_buffer, %r14    # buffer ptr 
@@ -81,14 +112,78 @@ p1_notfound:
         call exit
 p1_done:
         mov %r15, %rax
+        pop %rbx
+        pop %r12
+        pop %r13
+        pop %r14
+        pop %r15
         pop %rbp
         ret
 
-        .section .rodata
-dbg_msg:        .asciz "[%d] %c - %d\n"
-        .section .text
-        
-### Calculate the bitmask for the given line of items
+### Find the single common item in a group of 3 lines
+### Returns the total score in %rax
+        .type part2, function
+part2:
+        push %rbp
+        push %r15
+        push %r14
+        push %r13
+        push %r12
+        push %rbx
+        mov %rsp, %rbp
+        xor %sil, %sil          # initialize the lookup table
+        xor %ecx, %ecx
+        mov $in_buffer, %r14    # buffer ptr 
+p2_ltbl_loop:
+        cmp $64, %sil
+        je p2_init_done
+        mov $'A', %cl            # loop over letters covering A-z
+        add %sil, %cl
+        inc %sil
+        mov %cl, %al                 # remember the character
+        andb $63, %cl                # cl %= 64
+        movb %al, lookup_table(,%ecx,) # save character to that offset in the lookup table
+        jmp p2_ltbl_loop
+p2_init_done:   
+        xor %r15, %r15          # score
+        mov $in_buffer, %r14    # buffer ptr 
+        xor %r13, %r13          # line counter
+p2_nextgroup:
+        xor %rbx, %rbx                 # 3-group counter
+        mov $0xFFFFFFFFFFFFFFFF, %r11 # 3-group mask
+p2_newline:
+        cmp $3, %rbx
+        je p2_groupdone
+        mov line_endings(,%r13,8), %r12  # end-of-line ptr
+        sub %r14, %r12                   # num characters on this line
+        mov %r14, %rdi
+        mov %r12, %rsi
+        call get_mask_for_slice
+        and %rax, %r11          # merge masks to identify common items
+        inc %rbx
+        inc %r13
+        add %r12, %r14          # move to end of line
+        inc %r14                # skip the newline character
+        jmp p2_newline
+p2_groupdone:
+        bsf %r11, %rax          # bit-scan-forward - finds the index of the lowest set bit
+        movb lookup_table(,%rax), %dil
+        call get_priority
+        add %rax, %r15
+        cmp %r13, num_lines
+        je p2_done
+        jmp p2_nextgroup
+p2_done:
+        mov %r15, %rax
+        pop %rbx
+        pop %r12
+        pop %r13
+        pop %r14
+        pop %r15
+        pop %rbp
+        ret
+
+### Calculate the combined bitmask for the given line of items
 ###  %rdi - pointer to line
 ###  %rsi - number of items to read
 ### Returns the 64bit mask in %rax
@@ -136,7 +231,6 @@ lowercase:
         ret
         
 ### Parse the buffer to establish line ending positions
-
         .type get_line_endings, function #
 get_line_endings:
         push %rbp
@@ -165,8 +259,4 @@ eof:
         pop %r15
         pop %rbp
         ret
-        
-        .section .bss
-        .lcomm in_buffer, BUFFSIZE
-        .lcomm line_endings, LINE_END_SIZE
         
