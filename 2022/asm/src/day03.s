@@ -93,7 +93,10 @@ p1_second_half_loop:
         inc %rdi
         xor %r9, %r9
         movb %cl, %r9b          # copy of byte read
-        call get_mask_for_char
+        ## get_mask_for_char inlined here for performance reasons
+        andb $63, %cl           # cl = cl mod 64
+        mov $1, %rax
+        shl %cl, %rax           # shift to place in bit vector
         and %rbx, %rax          # test if this item is already present in the mask
         jz p1_second_half_loop  # if not, loop again
         add %r12, %r14          # found it! Now move buffer to next line
@@ -209,6 +212,8 @@ mask_done:
 ### Calculate the 64-bit mask for a single character
 ###  %cl - byte register should contain the character
 ### Returns the 64-bit mask in %rax
+### NOTE - no longer used as the non-inlined version
+### came at considerable performance cost 
         .type get_mask_for_char, function
 get_mask_for_char:
         andb $63, %cl           # cl = cl mod 64

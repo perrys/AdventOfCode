@@ -31,8 +31,8 @@ machine which has an AMD Ryzen 7 7700 CPU.
 | 2022 Day 1 Part 2 |  9699 |  4989 |
 | 2022 Day 2 Part 1 | 43939 | 14479 |
 | 2022 Day 2 Part 2 | 43790 | 11670 |
-| 2022 Day 3 Part 1 |  3690 |  7629 |
-| 2022 Day 3 Part 2 |  5469 |  9729 |
+| 2022 Day 3 Part 1 |  3690 |  3270 |
+| 2022 Day 3 Part 2 |  5469 |  4415 |
 
 
 ## 2022 Day 1
