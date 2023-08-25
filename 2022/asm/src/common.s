@@ -1,18 +1,30 @@
 
-        .equ SUM, 0
-        .equ SUMSQ, 8
-        .equ COUNT, 16
-        .equ MIN, 24
+        .equ SYS_READ, 0
+        .equ FD_STDERR, 1
 
+###
+### Read only data
+### 
         .section .rodata
 outmsg: .asciz "Elapsed time- min: %dns, avg: %.0f, stddev: %.0f\n"
 input_err: .asciz "ERROR: Unable to read input\n"
 
+###
+### Initialized data
+### 
         .section .data
-.t0:    .quad 0,0           
-.t1:    .quad 0,0           
-.stats: .quad 0,0,0,0
+t0_mark: .quad 0,0           
+t1_mark: .quad 0,0           
+        ## Offsets into the stats struct:
+        .equ SUM, 0
+        .equ SUMSQ, 8
+        .equ COUNT, 16
+        .equ MIN, 24
+timer_stats: .quad 0,0,0,0
 
+###
+### Code Section
+### 
         .section .text
         
 ### Return the absolute value of a (signed) 64-bit integer
@@ -40,23 +52,19 @@ read_file:
         push %rbp
         mov %rsp, %rbp
         sub $STSIZE, %rsp
-
-        .equ SYS_READ, 0
         mov $SYS_READ, %rax
         syscall
         mov %rax, ST_BYTESREAD(%rbp)
-
         cmp $0, %rax
-        jg .read_success
-        .equ FD_STDERR, 1
+        jg read_success
+        ## Error handler:
         mov $FD_STDERR, %rdi
         mov $input_err, %rsi
         mov $0, %rax
         call fprintf
         mov $1, %rax
         call exit
-
-.read_success:
+read_success:
         mov ST_BYTESREAD(%rbp), %rax
         add $STSIZE, %rsp
         pop %rbp
@@ -82,29 +90,29 @@ perf_timer:
         mov %rdi, ST_FUNCTION(%rbp)
         mov %rsi, ST_COUNTER(%rbp)
         mov $0, %rax
-        mov %rax, .stats+SUM
-        mov %rax, .stats+SUMSQ
-        mov %rax, .stats+COUNT
+        mov %rax, timer_stats+SUM
+        mov %rax, timer_stats+SUMSQ
+        mov %rax, timer_stats+COUNT
         mov $0xffffffffffffffff, %rax
-        mov %rax, .stats+MIN
+        mov %rax, timer_stats+MIN
         
  .l0:   mov ST_COUNTER(%rbp), %r15 # loop counter to decrement 
         cmp $0, %r15
         je .l0d
 
         mov $CLOCK_MONOTONIC, %rdi
-        mov $.t0, %rsi
+        mov $t0_mark, %rsi
         call clock_gettime
 
         call * ST_FUNCTION(%rbp)
         mov %rax, %r14
 
         mov $CLOCK_MONOTONIC, %rdi
-        mov $.t1, %rsi
+        mov $t1_mark, %rsi
         call clock_gettime
 
-        mov $.t0, %rdi
-        mov $.t1, %rsi
+        mov $t0_mark, %rdi
+        mov $t1_mark, %rsi
         call mark_time
 
         mov ST_COUNTER(%rbp), %rax
@@ -130,20 +138,20 @@ perf_timer:
 mark_time:
         call calc_elapsed
         cvtsi2sd %eax, %xmm0
-        movsd .stats+SUM, %xmm1
+        movsd timer_stats+SUM, %xmm1
         addsd %xmm0, %xmm1
-        movsd %xmm1, .stats+SUM
+        movsd %xmm1, timer_stats+SUM
         mulsd %xmm0, %xmm0
-        movsd .stats+SUMSQ, %xmm1
+        movsd timer_stats+SUMSQ, %xmm1
         addsd %xmm0, %xmm1
-        movsd %xmm1, .stats+SUMSQ
-        cmpq .stats+MIN, %rax
+        movsd %xmm1, timer_stats+SUMSQ
+        cmpq timer_stats+MIN, %rax
         jae .notmin
-        mov %rax, .stats+MIN
+        mov %rax, timer_stats+MIN
         .notmin:
-        mov .stats+COUNT, %rax
+        mov timer_stats+COUNT, %rax
         inc %rax
-        mov %rax, .stats+COUNT
+        mov %rax, timer_stats+COUNT
         ret
 
 ### Calculate the elapsed time between to timer points in nanoseconds
@@ -166,12 +174,12 @@ calc_elapsed:
 print_stats:
         
         mov $outmsg, %rdi
-        mov .stats+MIN, %rsi
-        movsd .stats+SUM, %xmm0
-        mov .stats+COUNT, %rax
+        mov timer_stats+MIN, %rsi
+        movsd timer_stats+SUM, %xmm0
+        mov timer_stats+COUNT, %rax
         cvtsi2sd %rax, %xmm3
         divsd %xmm3, %xmm0      # xmm0 has average
-        movsd .stats+SUMSQ, %xmm1
+        movsd timer_stats+SUMSQ, %xmm1
         divsd %xmm3, %xmm1      # xmm1 has sumsq/N 
         movsd %xmm0, %xmm3
         mulsd %xmm0, %xmm3      # xmm3 - avg*avg
