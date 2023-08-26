@@ -1,6 +1,5 @@
         .equ FD_STDERR, 1
         .equ BUFFSIZE, 16000
-        .equ LINE_END_SIZE, 400*8
         .equ N_COUNT, 10000
 
 ###
