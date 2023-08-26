@@ -1,13 +1,19 @@
 
         .equ SYS_READ, 0
-        .equ FD_STDERR, 1
+        .equ SYS_OPEN, 2
+        .equ SYS_CLOSE, 3
+        .equ O_RDONLY, 0
+        .equ FD_STDIN, 0
+        .equ FD_STDERR, 2
 
 ###
 ### Read only data
 ### 
         .section .rodata
 outmsg: .asciz "Elapsed time- min: %dns, avg: %.0f, stddev: %.0f\n"
-input_err: .asciz "ERROR: Unable to read input\n"
+input_errmsg: .asciz "ERROR: Unable to read input\n"
+open_failed_errmsg: .asciz "ERROR: Could not open file \"%s\"\n"
+close_failed_errmsg: .asciz "ERROR: Could not close file \"%s\"\n"
 
 ###
 ### Initialized data
@@ -40,6 +46,68 @@ abs:
         mov %rdi, %rax
         ret
 
+### Open the given filename and read the contents into a buffer, aborting
+### on failure
+###   %rdi - char pointer to file name
+###   %rsi - pointer to buffer
+###   %rdx - size of buffer
+        .type open_and_read_file, function
+        .global open_and_read_file
+open_and_read_file:
+        .equ STSIZE, 5*8
+        .equ ST_BYTESREAD, -1*8
+        .equ ST_FNAME,   -2*8
+        .equ ST_BUFFER,  -3*8
+        .equ ST_BUFSIZE, -4*8
+        .equ ST_FHANDLE, -5*8
+        push %rbp
+        mov %rsp, %rbp
+        sub $STSIZE, %rbp
+        mov %rdi, ST_FNAME(%rbp)
+        mov %rsi, ST_BUFFER(%rbp)
+        mov %rdx, ST_BUFSIZE(%rbp)
+        ## open the file read-only:
+        mov $O_RDONLY, %rsi
+        mov $SYS_OPEN, %rax
+        syscall
+        mov %rax, ST_FHANDLE(%rbp)
+        ## Test if open was successful:
+        cmp $0, %rax
+        jge opened_ok
+        ## Open failed, print error and exit
+        mov %rdi, %rdx
+        mov $open_failed_errmsg, %rsi
+        mov $FD_STDERR, %rdi
+        mov $0, %rax
+        call dprintf
+        mov $1, %rdi
+        call exit
+opened_ok:      
+        mov ST_FHANDLE(%rbp), %rdi 
+        mov ST_BUFFER(%rbp), %rsi 
+        mov ST_BUFSIZE(%rbp), %rdx 
+        call read_file
+        mov %rax, ST_BYTESREAD(%rbp)
+        ## Now close the file
+        mov $SYS_CLOSE, %rax
+        mov ST_FHANDLE(%rbp), %rdi 
+        syscall
+        cmp $0, %rax
+        jge closed_ok
+        ## Close failed, something is wrong, best to abort:
+        mov ST_FNAME(%rbp), %rdx 
+        mov $close_failed_errmsg, %rsi
+        mov $FD_STDERR, %rdi
+        mov $0, %rax
+        call dprintf
+        mov $1, %rdi
+        call exit
+closed_ok:
+        mov ST_BYTESREAD(%rbp), %rax
+        add $STSIZE, %rbp
+        pop %rbp
+        ret
+        
 ### Read the entire contents of a file into a buffer. Abort if read fails.
 ###   %rdi - file descriptor
 ###   %rsi - pointer to buffer
@@ -48,7 +116,7 @@ abs:
         .global read_file
 read_file:
         .equ ST_BYTESREAD, -1*8
-        .equ STSIZE, 1*8 # keep this 16-byte aligned when calling C functions 
+        .equ STSIZE, 2*8
         push %rbp
         mov %rsp, %rbp
         sub $STSIZE, %rsp
@@ -59,9 +127,9 @@ read_file:
         jg read_success
         ## Error handler:
         mov $FD_STDERR, %rdi
-        mov $input_err, %rsi
+        mov $input_errmsg, %rsi
         mov $0, %rax
-        call fprintf
+        call dprintf
         mov $1, %rax
         call exit
 read_success:
