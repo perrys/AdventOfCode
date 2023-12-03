@@ -7,7 +7,7 @@ fn main() {
         panic!("USAGE {} <filename>", argv[0]);
     }
     let contents = fs::read_to_string(&argv[1]).expect("unable to read file contents");
-    let contents: Vec<&str> = contents.split('\n').collect();
+    let contents: Vec<&str> = contents.lines().collect();
     part1(&contents);
     part2(&contents);
 }
@@ -31,7 +31,7 @@ fn part1(contents: &[&str]) {
 
 static NUMBERS: [&str; 9] = [
     "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-]; // there is no zero
+];
 
 fn part2(contents: &[&str]) {
     let mut total: usize = 0;
@@ -43,7 +43,7 @@ fn part2(contents: &[&str]) {
         .unwrap();
     let parse_next = |remain: &str| -> (Option<usize>, usize) {
         let first = remain.chars().next().unwrap();
-        if first >= '0' && first <= '9' {
+        if first.is_ascii_digit() {
             let digit = first as u8 - b'0';
             return (Some(digit as usize), 1);
         }
