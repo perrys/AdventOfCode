@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, ops::Range};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -9,64 +9,41 @@ fn main() {
     let filename = &args[1];
     let contents = fs::read_to_string(filename).expect("Couldn't read file {filename}");
     let contents: Vec<_> = contents.lines().collect();
-    part1(&contents);
-    //    part2(&contents);
+
+    println!("part1 total is {}", part1(&contents));
+    println!("part2 total is {}", part2(&contents));
 }
 
-fn is_symbol(c: char) -> bool {
-    !(c.is_ascii_digit() || c == '.')
+#[derive(PartialEq, Debug)]
+struct PartNumber {
+    value: usize,
+    range: Range<usize>,
 }
 
-fn is_adjacent_to_symbol(
-    lines: &[&str],
-    line_idx: usize,
-    start_idx: usize,
-    token_len: usize,
-) -> bool {
-    let line_len = lines[0].len(); // we know they are all the same length
-    let start_col = start_idx - std::cmp::min(start_idx, 1);
-    let end_col = std::cmp::min(start_idx + token_len, line_len - 1);
-    if is_symbol(
-        lines[line_idx]
-            .chars()
-            .nth(start_col)
-            .expect("unable to get char at start col"),
-    ) {
-        return true;
+impl PartNumber {
+    fn new(value: usize, range: Range<usize>) -> Self {
+        Self { value, range }
     }
-    if is_symbol(
-        lines[line_idx]
-            .chars()
-            .nth(end_col)
-            .expect("unable to get char at end col"),
-    ) {
-        return true;
+
+    fn is_adjacent_to(&self, col_idx: usize) -> bool {
+        let diag_range =
+            (self.range.start - std::cmp::min(self.range.start, 1))..self.range.end + 1;
+        diag_range.contains(&col_idx)
     }
-    if line_idx > 0
-        && lines[line_idx - 1][start_col..=end_col]
-            .chars()
-            .any(is_symbol)
-    {
-        return true;
-    }
-    if (line_idx + 1) < lines.len()
-        && lines[line_idx + 1][start_col..=end_col]
-            .chars()
-            .any(is_symbol)
-    {
-        return true;
-    }
-    false
 }
 
-fn part1(lines: &[&str]) {
-    let mut total: usize = 0;
-    let mut process_accumulator = |line_idx, col_idx, len, accum| {
-        if is_adjacent_to_symbol(lines, line_idx, col_idx - len, len) {
-            total += accum;
-        }
-    };
-    for (line_idx, &line) in lines.iter().enumerate() {
+#[derive(Debug)]
+struct ParsedLine {
+    pub numbers: Vec<PartNumber>,
+    pub sym_posns: Vec<usize>,
+}
+
+impl ParsedLine {
+    fn new(line: &str, symbol_predicate: impl Fn(char) -> bool) -> Self {
+        let mut result = Self {
+            numbers: Vec::new(),
+            sym_posns: Vec::new(),
+        };
         let mut accum: usize = 0;
         let mut len: usize = 0;
         for (col_idx, c) in line.chars().enumerate() {
@@ -74,15 +51,195 @@ fn part1(lines: &[&str]) {
                 accum *= 10;
                 accum += (c as u8 - b'0') as usize;
                 len += 1;
-            } else if accum > 0 {
-                process_accumulator(line_idx, col_idx, len, accum);
-                accum = 0;
-                len = 0;
+            } else {
+                if accum > 0 {
+                    result
+                        .numbers
+                        .push(PartNumber::new(accum, col_idx - len..col_idx));
+                    accum = 0;
+                    len = 0;
+                }
+                if symbol_predicate(c) {
+                    result.sym_posns.push(col_idx);
+                }
             }
         }
         if accum > 0 {
-            process_accumulator(line_idx, line.len(), len, accum);
+            result
+                .numbers
+                .push(PartNumber::new(accum, line.len() - len..line.len()));
+        }
+        result
+    }
+}
+
+fn is_symbol(c: char) -> bool {
+    !(c.is_ascii_digit() || c == '.')
+}
+
+fn part1(lines: &[&str]) -> usize {
+    let mut total: usize = 0;
+    let parsedlines = lines
+        .iter()
+        .map(|line| ParsedLine::new(line, is_symbol))
+        .collect::<Vec<_>>();
+    for (line_idx, pline) in parsedlines.iter().enumerate() {
+        for num in pline.numbers.iter() {
+            if line_idx > 0
+                && parsedlines[line_idx - 1]
+                    .sym_posns
+                    .iter()
+                    .any(|&col_idx| num.is_adjacent_to(col_idx))
+            {
+                total += num.value;
+                continue;
+            }
+            if pline
+                .sym_posns
+                .iter()
+                .any(|&col_idx| num.is_adjacent_to(col_idx))
+            {
+                total += num.value;
+                continue;
+            }
+            if line_idx < parsedlines.len() - 1
+                && parsedlines[line_idx + 1]
+                    .sym_posns
+                    .iter()
+                    .any(|&col_idx| num.is_adjacent_to(col_idx))
+            {
+                total += num.value;
+                continue;
+            }
         }
     }
-    println!("part1 total is {total}");
+    total
+}
+
+fn is_gear(c: char) -> bool {
+    c == '*'
+}
+
+fn part2(lines: &[&str]) -> usize {
+    let mut total: usize = 0;
+    let parsedlines = lines
+        .iter()
+        .map(|line| ParsedLine::new(line, is_gear))
+        .collect::<Vec<_>>();
+    let mut candidates = Vec::<&PartNumber>::new();
+    for (line_idx, pline) in parsedlines.iter().enumerate() {
+        for &gear_posn in pline.sym_posns.iter() {
+            if line_idx > 0 {
+                candidates.extend(
+                    parsedlines[line_idx - 1]
+                        .numbers
+                        .iter()
+                        .filter(|&num| num.is_adjacent_to(gear_posn)),
+                );
+            }
+            if line_idx < lines.len() - 1 {
+                candidates.extend(
+                    parsedlines[line_idx + 1]
+                        .numbers
+                        .iter()
+                        .filter(|&num| num.is_adjacent_to(gear_posn)),
+                );
+            }
+            candidates.extend(
+                pline
+                    .numbers
+                    .iter()
+                    .filter(|&num| num.is_adjacent_to(gear_posn)),
+            );
+            assert!(candidates.len() <= 2);
+            if candidates.len() == 2 {
+                total += candidates[0].value * candidates[1].value;
+            }
+            candidates.clear();
+        }
+    }
+    total
+}
+
+#[allow(non_snake_case)]
+#[cfg(test)]
+mod tester {
+    use super::*;
+
+    #[test]
+    fn GIVEN_various_lines_WHEN_parsing_THEN_expected_numbers_and_symbols() {
+        // number in middle
+        let line = "*(123%.";
+        let pline = ParsedLine::new(line, |_| false);
+        assert_eq!(pline.numbers, vec![PartNumber::new(123, 2..5)]);
+        assert!(pline.sym_posns.is_empty());
+
+        // at start
+        let line = "123%.";
+        let pline = ParsedLine::new(line, |_| false);
+        assert_eq!(pline.numbers, vec![PartNumber::new(123, 0..3)]);
+        assert!(pline.sym_posns.is_empty());
+
+        // just symbol
+        let line = ".^.";
+        let pline = ParsedLine::new(line, |c| c == '^');
+        assert!(pline.numbers.is_empty());
+        assert_eq!(pline.sym_posns, vec![1]);
+
+        // at end with symbol
+        let line = ".^.2345";
+        let pline = ParsedLine::new(line, |c| c == '^');
+        assert_eq!(pline.numbers, vec![PartNumber::new(2345, 3..7)]);
+        assert_eq!(pline.sym_posns, vec![1]);
+
+        // multiple, no spaces
+        let line = "123^234";
+        let pline = ParsedLine::new(line, |c| c == '^');
+        assert_eq!(
+            pline.numbers,
+            vec![PartNumber::new(123, 0..3), PartNumber::new(234, 4..7)]
+        );
+        assert_eq!(pline.sym_posns, vec![3]);
+    }
+
+    #[test]
+    fn GIVEN_parsed_number_WHEN_testing_adjacent_THEN_allows_diagonals() {
+        let num = PartNumber::new(7, 0..1);
+        assert!(num.is_adjacent_to(0));
+        assert!(num.is_adjacent_to(1));
+        assert!(!num.is_adjacent_to(2));
+
+        let num = PartNumber::new(3, 2..5);
+        assert!(!num.is_adjacent_to(0));
+        assert!(num.is_adjacent_to(1));
+        assert!(num.is_adjacent_to(2));
+        assert!(num.is_adjacent_to(4));
+        assert!(num.is_adjacent_to(5));
+        assert!(!num.is_adjacent_to(6));
+    }
+
+    static TEST_INPUT: &str = r#"
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+"#;
+
+    #[test]
+    fn GIVEN_aoc_example_input_WHEN_part1_run_THEN_matches_expected_total() {
+        let contents: Vec<_> = TEST_INPUT.lines().collect();
+        assert_eq!(part1(&contents), 4361);
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_input_WHEN_part2_run_THEN_matches_expected_total() {
+        let contents: Vec<_> = TEST_INPUT.lines().collect();
+        assert_eq!(part2(&contents), 467835);
+    }
 }
