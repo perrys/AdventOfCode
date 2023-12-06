@@ -10,40 +10,40 @@ fn main() {
     let contents = fs::read_to_string(filename).expect("Couldn't read file {filename}");
 
     println!("part1 total is {}", part1(contents.as_str()));
-    // println!("part2 total is {}", part2(&contents));
+    println!("part2 total is {}", part2(contents.as_str()));
 }
 
 fn split_line(line: &str) -> [&str; 2] {
     let prefix = line.find(": ").expect("Couldn't find first colon");
     line[1 + prefix..]
-        .split("|")
+        .split('|')
         .map(str::trim)
         .collect::<Vec<_>>()
         .try_into()
         .expect("didn't split into 2 parts")
 }
 
-fn part1_parse_line(line: &str) -> usize {
-    let [win_nums, my_nums] = split_line(line);
-    let mut win_nums = win_nums
+fn parse_line(line: &str) -> usize {
+    let [winning_nums, my_nums] = split_line(line);
+    let mut winning_nums = winning_nums
         .split(' ')
         .filter(|s| !s.trim().is_empty())
-        .map(|s| s.parse::<usize>().expect("unparsable number in {win_nums}"))
-        .collect::<Vec<_>>();
-    win_nums.sort();
-    let mut total: usize = 0;
+        .map(|s| {
+            s.parse()
+                .unwrap_or_else(|_| panic!("unparsable number in {winning_nums}"))
+        })
+        .collect::<Vec<u8>>();
+    winning_nums.sort();
+    let mut total = 0;
     my_nums
         .split(' ')
         .filter(|s| !s.trim().is_empty())
         .for_each(|nstr| {
             let n = nstr
-                .parse::<usize>()
-                .expect("unable to parse number in {my_nums}");
-            if let Some(_) = win_nums.binary_search(&n).ok() {
-                total = match total {
-                    0 => 1,
-                    _ => total * 2,
-                }
+                .parse()
+                .unwrap_or_else(|_| panic!("unable to parse number in {my_nums}"));
+            if winning_nums.binary_search(&n).is_ok() {
+                total += 1;
             };
         });
     total
@@ -53,9 +53,34 @@ fn part1(content: &str) -> usize {
     content
         .lines()
         .filter(|&s| !s.trim().is_empty())
-        .map(part1_parse_line)
+        .map(parse_line)
+        .map(|n| {
+            if n > 0 {
+                2_usize.pow((n - 1) as u32)
+            } else {
+                0
+            }
+        })
         .sum()
 }
+fn part2(content: &str) -> usize {
+    let card_scores = content
+        .lines()
+        .filter(|&s| !s.trim().is_empty())
+        .map(parse_line)
+        .collect::<Vec<_>>();
+    let mut num_cards = vec![1; card_scores.len()];
+    let trunc_scores = &card_scores[0..(card_scores.len() - 1)];
+    for (idx, score) in trunc_scores.iter().enumerate() {
+        let this_card_count = num_cards[idx];
+        let next_cards = &mut num_cards[idx + 1..(idx + 1 + *score)];
+        for num in next_cards.iter_mut() {
+            *num += this_card_count;
+        }
+    }
+    num_cards.iter().sum()
+}
+
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tester {
@@ -70,14 +95,14 @@ mod tester {
     }
 
     #[test]
-    fn GIVEN_valid_lines_WHEN_run_part1_parse_THEN_expecte_total_returned() {
+    fn GIVEN_valid_lines_WHEN_run_part1_parse_THEN_expected_total_returned() {
         let dotest = |line, expected| {
-            assert_eq!(expected, part1_parse_line(line));
+            assert_eq!(expected, parse_line(line));
         };
-        dotest("c1: 1234 | 4567 ", 0);
-        dotest("c1: 1234 | 1234 ", 1);
+        dotest("c1: 12 34 | 45 67 ", 0);
+        dotest("c1: 12 34 | 12 34 ", 2);
         dotest("c1: 3 2 4 |  2 4 5 67 ", 2);
-        dotest("c1: 1 2 3 4 | 4 3 2 1 ", 8);
+        dotest("c1: 1 2 3 4 | 4 3 2 1 ", 4);
     }
 
     static EXAMPLE: &str = r#"
@@ -91,5 +116,9 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11
     #[test]
     fn GIVEN_aoc_example_input_WHEN_part1_run_THEN_expected_total_returned() {
         assert_eq!(13, part1(EXAMPLE));
+    }
+    #[test]
+    fn GIVEN_aoc_example_input_WHEN_part2_run_THEN_expected_total_returned() {
+        assert_eq!(30, part2(EXAMPLE));
     }
 }
