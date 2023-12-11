@@ -200,20 +200,16 @@ impl FillMap {
             let mut r = r;
             let mut c = c;
             let d = if flip { d.opposite() } else { d };
-            loop {
-                if let Some((r1, c1)) = try_step(fillmap, r, c, d) {
-                    let segment = fillmap[r1][c1];
-                    match segment {
-                        FillSegment::Unknown => fillmap[r1][c1] = filltype,
-                        FillSegment::Path => break,
-                        _ if segment != filltype => panic!("conflicting filltypes for {r1},{c1}"),
-                        _ => (),
-                    }
-                    r = r1;
-                    c = c1;
-                } else {
-                    break;
+            while let Some((r1, c1)) = try_step(fillmap, r, c, d) {
+                let segment = fillmap[r1][c1];
+                match segment {
+                    FillSegment::Unknown => fillmap[r1][c1] = filltype,
+                    FillSegment::Path => break,
+                    _ if segment != filltype => panic!("conflicting filltypes for {r1},{c1}"),
+                    _ => (),
                 }
+                r = r1;
+                c = c1;
             }
         };
 
