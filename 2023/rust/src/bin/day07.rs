@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 7.
+//!
+//! See <https://adventofcode.com/2023/day/7>
+//!
 use std::{cmp::Ordering, fs};
 
 fn main() {

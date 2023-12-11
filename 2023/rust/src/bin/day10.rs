@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 10.
+//!
+//! See <https://adventofcode.com/2023/day/10>
+//!
 use std::fs;
 
 fn main() {
@@ -9,8 +14,8 @@ fn main() {
     let filename = &args[1];
     let contents = fs::read_to_string(filename).expect("Couldn't read file {filename}");
 
-    println!("part1 total is {}", part1(contents.as_str()));
-    println!("part2 total is {:#?}", part2(contents.as_str()));
+    println!("part1 answer is {}", part1(contents.as_str()));
+    println!("part2 answer is {:#?}", part2(contents.as_str()));
 }
 
 type InputMap = Vec<Vec<Option<Pipe>>>;

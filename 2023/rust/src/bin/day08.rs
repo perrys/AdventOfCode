@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 8.
+//!
+//! See <https://adventofcode.com/2023/day/8>
+//!
 use std::collections::HashMap;
 use std::fs;
 

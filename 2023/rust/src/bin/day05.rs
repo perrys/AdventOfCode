@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 5.
+//!
+//! See <https://adventofcode.com/2023/day/5>
+//!
 use std::fs;
 
 use std::ops::Range;

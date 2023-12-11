@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 6.
+//!
+//! See <https://adventofcode.com/2023/day/6>
+//!
 use std::fs;
 
 fn main() {

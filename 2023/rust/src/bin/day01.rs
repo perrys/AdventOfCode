@@ -1,3 +1,8 @@
+//!
+//! Advent of code challenge 2023 day 1.
+//!
+//! See <https://adventofcode.com/2023/day/1>
+//!
 use std::env;
 use std::fs;
 
