@@ -10,12 +10,20 @@ fn main() {
     let contents = fs::read_to_string(filename).expect("Couldn't read file {filename}");
 
     println!("part1 total is {}", part1(contents.as_str()));
-    //    println!("part2 total is {}", part2(contents.as_str()));
+    println!("part2 total is {}", part2(contents.as_str()));
 }
 
 fn part1(contents: &str) -> usize {
+    calculate(contents, 2)
+}
+
+fn part2(contents: &str) -> usize {
+    calculate(contents, 1_000_000)
+}
+
+fn calculate(contents: &str, multiplier: usize) -> usize {
     let (nrows, ncols, galaxies) = parse_file(contents);
-    let (row_weights, col_weights) = get_weights(&galaxies, nrows, ncols);
+    let (row_weights, col_weights) = get_weights(&galaxies, nrows, ncols, multiplier);
     let mut total = 0;
     for (idx1, g1) in galaxies.iter().enumerate() {
         for g2 in galaxies.iter().skip(idx1 + 1) {
@@ -55,14 +63,19 @@ fn parse_file(contents: &str) -> (usize, usize, Vec<CoOrd>) {
     (nrows + 1, ncols + 1, result)
 }
 
-fn get_weights(galaxies: &[CoOrd], nrows: usize, ncols: usize) -> (Vec<usize>, Vec<usize>) {
+fn get_weights(
+    galaxies: &[CoOrd],
+    nrows: usize,
+    ncols: usize,
+    multiplier: usize,
+) -> (Vec<usize>, Vec<usize>) {
     let weights_fn = |num, pred: fn(&CoOrd, usize) -> bool| {
         (0..num)
             .map(|idx| {
                 if galaxies.iter().any(|g| pred(g, idx)) {
                     1
                 } else {
-                    2
+                    multiplier
                 }
             })
             .collect::<Vec<_>>()
@@ -104,12 +117,12 @@ mod test11 {
     #[test]
     fn GIVEN_galaxy_map_WHEN_calcing_wieghts_THEN_empty_rows_doubled() {
         let galaxies = vec![(0, 0), (0, 2), (3, 2)];
-        let (rw, cw) = get_weights(&galaxies, 4, 5);
+        let (rw, cw) = get_weights(&galaxies, 4, 5, 2);
         assert_eq!(vec![1, 2, 2, 1], rw);
         assert_eq!(vec![1, 2, 1, 2, 2], cw);
 
         let (nrows, ncols, galaxies) = parse_file(EXAMPLE_INPUT);
-        let (rw, cw) = get_weights(&galaxies, nrows, ncols);
+        let (rw, cw) = get_weights(&galaxies, nrows, ncols, 2);
         assert_eq!(nrows + 2, rw.iter().sum());
         assert_eq!(ncols + 3, cw.iter().sum());
     }
@@ -117,5 +130,11 @@ mod test11 {
     #[test]
     fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
         assert_eq!(374, part1(EXAMPLE_INPUT));
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_part2_run_THEN_matches_expected() {
+        assert_eq!(1030, calculate(EXAMPLE_INPUT, 10));
+        assert_eq!(8410, calculate(EXAMPLE_INPUT, 100));
     }
 }
