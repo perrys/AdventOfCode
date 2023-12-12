@@ -33,9 +33,42 @@ enum SpringCondition {
     Unknown,
 }
 
+impl SpringCondition {
+    fn new(c: char) -> Self {
+        match c {
+            '#' => Self::Broken,
+            '?' => Self::Unknown,
+            '.' => Self::Working,
+            _ => panic!("usupported spring condition \"{c}\""),
+        }
+    }
+}
+
 struct Record {
     springs: Vec<SpringCondition>,
     broken_spans: Vec<usize>,
+}
+
+impl Record {
+    fn new(line: &str) -> Self {
+        let mut iter = line.split(' ');
+        let springs = iter
+            .next()
+            .unwrap_or_else(|| panic!("unable to tokenize \"{line}\""))
+            .chars()
+            .map(SpringCondition::new)
+            .collect::<Vec<_>>();
+        let broken_spans = iter
+            .next()
+            .unwrap_or_else(|| panic!("single token in line \"{line}\""))
+            .split(',')
+            .map(|s| s.parse::<usize>().expect("unparsable integer"))
+            .collect::<Vec<_>>();
+        Self {
+            springs,
+            broken_spans,
+        }
+    }
 }
 
 fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
@@ -56,6 +89,10 @@ fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
 }
 
 fn possibilities(spring: &[SpringCondition], broken_spans: &[usize]) -> Option<usize> {
+    let mut iter = spring
+        .iter()
+        .take_while(|&s| *s == SpringCondition::Working);
+
     // walk along record
     // ignore first working
     // if first is broken - fill remainder, then recurse
@@ -63,4 +100,52 @@ fn possibilities(spring: &[SpringCondition], broken_spans: &[usize]) -> Option<u
     //  ok - repeat until full, then recurse
     //  not ok - mark previous attempts working and continue
     None
+}
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod test12 {
+    use crate::*;
+
+    #[test]
+    fn GIVEN_valid_line_record_WHEN_parsing_THEN_corect_record_produced() {
+        let record = Record::new("##????????#?#????.? 4,1,8,2");
+        assert_eq!(19, record.springs.len());
+        assert_eq!(SpringCondition::Broken, record.springs[1]);
+        assert_eq!(SpringCondition::Unknown, record.springs[5]);
+        assert_eq!(SpringCondition::Working, record.springs[17]);
+        assert_eq!(vec![4, 1, 8, 2], record.broken_spans);
+    }
+
+    #[test]
+    fn GIVEN_valid_records_WHEN_testing_consistency_THEN_true_returned() {
+        let dotest = |line| {
+            let record = Record::new(line);
+            assert!(is_consistent(&record.springs, &record.broken_spans));
+        };
+        dotest("???? 1,2");
+        dotest("?.?? 1,2");
+
+        for line in EXAMPLE_INPUT.lines().filter(|l| !l.trim().is_empty()) {
+            dotest(line);
+        }
+    }
+
+    #[test]
+    fn GIVEN_invalid_records_WHEN_testing_consistency_THEN_false_returned() {
+        let dotest = |line| {
+            let record = Record::new(line);
+            assert!(!is_consistent(&record.springs, &record.broken_spans));
+        };
+        dotest("?.? 1,2");
+    }
+
+    static EXAMPLE_INPUT: &str = r#"
+???.### 1,1,3
+.??..??...?##. 1,1,3
+?#?#?#?#?#?#?#? 1,3,1,6
+????.#...#... 4,1,1
+????.######..#####. 1,6,5
+?###???????? 3,2,1
+"#;
 }
