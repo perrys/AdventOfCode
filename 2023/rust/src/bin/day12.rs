@@ -89,9 +89,23 @@ fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
 }
 
 fn possibilities(spring: &[SpringCondition], broken_spans: &[usize]) -> Option<usize> {
+    // eat  whitespace:
     let mut iter = spring
         .iter()
         .take_while(|&s| *s == SpringCondition::Working);
+
+    let first = iter.next();
+    if let Some(n) = first {
+        match n {
+            SpringCondition::Broken => {
+                // if the first in this group is a broken spring, the remainder must match exactly
+                let mut next_span = broken_spans[0];
+                while next_span > 0 {}
+            }
+            SpringCondition::Unknown => {}
+            SpringCondition::Working => unreachable!("already walked past working slots"),
+        }
+    }
 
     // walk along record
     // ignore first working
