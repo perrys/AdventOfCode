@@ -18,8 +18,16 @@ fn main() {
     println!("part2 total is {}", part2(contents.as_str()));
 }
 
-fn part1(_contents: &str) -> usize {
-    0
+fn part1(contents: &str) -> usize {
+    contents
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|line| {
+            let record = Record::new(line);
+            possibilities(&record.springs, &record.broken_spans)
+                .unwrap_or_else(|| panic!("couldn't calculate possibliites for line \"{line}\""))
+        })
+        .sum()
 }
 
 fn part2(_contents: &str) -> usize {
@@ -71,49 +79,89 @@ impl Record {
     }
 }
 
+#[allow(dead_code)] // for testing
 fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
     let slots = spring
         .split(|s| *s == SpringCondition::Working)
         .filter(|s| !s.is_empty())
         .map(|s| s.len())
         .collect::<Vec<_>>();
-    if slots.len() < broken_spans.len() {
-        return true;
+    match slots.len().cmp(&broken_spans.len()) {
+        std::cmp::Ordering::Less => {
+            // I think we could be stricter here - e.g. by testing all possible
+            // sub-divisions recursively. This might speed up the algo, but the
+            // following may be good enough to get it working..
+            true
+        }
+        std::cmp::Ordering::Greater => false,
+        std::cmp::Ordering::Equal => slots
+            .iter()
+            .zip(broken_spans.iter())
+            .all(|(slot_size, broken_span)| slot_size >= broken_span),
     }
-    if slots.len() < broken_spans.len() {
-        return true;
-    } else if slots.len() > broken_spans.len() {
-        return false;
-    }
-    slots.iter().zip(broken_spans.iter()).all(|(s, b)| s >= b)
 }
 
-fn possibilities(spring: &[SpringCondition], broken_spans: &[usize]) -> Option<usize> {
+fn possibilities(slice: &[SpringCondition], broken_spans: &[usize]) -> Option<usize> {
     // eat  whitespace:
-    let mut iter = spring
-        .iter()
-        .take_while(|&s| *s == SpringCondition::Working);
+    let mut slice = slice;
+    while !slice.is_empty() && slice[0] == SpringCondition::Working {
+        slice = &slice[1..]
+    }
 
-    let first = iter.next();
-    if let Some(n) = first {
-        match n {
+    let start_here = |mut sub_slice: &[SpringCondition]| {
+        if sub_slice.len() < broken_spans[0] {
+            return None;
+        }
+        for _ in 0..broken_spans[0] {
+            match sub_slice[0] {
+                SpringCondition::Unknown | SpringCondition::Broken => sub_slice = &sub_slice[1..],
+                _ => return None,
+            }
+        }
+        if !sub_slice.is_empty() {
+            // the item following a broken span must be working spring:
+            match sub_slice[0] {
+                SpringCondition::Unknown | SpringCondition::Working => sub_slice = &sub_slice[1..],
+                _ => return None,
+            }
+        }
+        possibilities(sub_slice, &broken_spans[1..])
+    };
+
+    if broken_spans.is_empty() {
+        match slice.iter().all(|s| *s != SpringCondition::Broken) {
+            true => Some(1),
+            false => None,
+        }
+    } else if slice.is_empty() {
+        match broken_spans.len() {
+            0 => Some(1),
+            _ => None,
+        }
+    } else {
+        match slice[0] {
             SpringCondition::Broken => {
                 // if the first in this group is a broken spring, the remainder must match exactly
-                let mut next_span = broken_spans[0];
-                while next_span > 0 {}
+                start_here(slice)
             }
-            SpringCondition::Unknown => {}
+            SpringCondition::Unknown => {
+                let mut sum_possibilities = 0;
+                // 1. assume broken:
+                if let Some(result) = start_here(slice) {
+                    sum_possibilities += result;
+                }
+                // 2. assume working:
+                if let Some(result) = possibilities(&slice[1..], broken_spans) {
+                    sum_possibilities += result;
+                }
+                match sum_possibilities {
+                    0 => None,
+                    _ => Some(sum_possibilities),
+                }
+            }
             SpringCondition::Working => unreachable!("already walked past working slots"),
         }
     }
-
-    // walk along record
-    // ignore first working
-    // if first is broken - fill remainder, then recurse
-    // if first is unknown - fill remainder, end test
-    //  ok - repeat until full, then recurse
-    //  not ok - mark previous attempts working and continue
-    None
 }
 
 #[cfg(test)]
@@ -154,6 +202,31 @@ mod test12 {
         dotest("?.? 1,2");
     }
 
+    #[test]
+    fn GIVEN_valid_records_WHEN_counting_possibilities_THEN_correct_answers_returned() {
+        let dotest = |line, expected| {
+            let record = Record::new(line);
+            assert_eq!(
+                expected,
+                possibilities(&record.springs, &record.broken_spans)
+            );
+        };
+        dotest(". 1", None);
+        dotest("# 1", Some(1));
+        dotest("#.# 1,1", Some(1));
+        dotest("#.? 1,1", Some(1));
+        dotest(".#..? 1,1", Some(1));
+        dotest(".#..?. 1,1", Some(1));
+        dotest(".#..??. 1,1", Some(2));
+        dotest(".??..#. 1,1", Some(2));
+        dotest(".??..??. 1,1", Some(4));
+        dotest(".??..??...?##. 1,1,3", Some(4));
+        dotest("????? 2,1", Some(3));
+        dotest("?????? 2,1", Some(6));
+        dotest("??????? 2,1", Some(10));
+        dotest("?###???????? 3,2,1", Some(10));
+    }
+
     static EXAMPLE_INPUT: &str = r#"
 ???.### 1,1,3
 .??..??...?##. 1,1,3
@@ -162,4 +235,9 @@ mod test12 {
 ????.######..#####. 1,6,5
 ?###???????? 3,2,1
 "#;
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
+        assert_eq!(21, part1(EXAMPLE_INPUT));
+    }
 }
