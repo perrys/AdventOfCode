@@ -3,7 +3,7 @@
 //!
 //! See <https://adventofcode.com/2023/day/12>
 //!
-use std::fs;
+use std::{collections::HashMap, fs};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -19,22 +19,27 @@ fn main() {
 }
 
 fn part1(contents: &str) -> usize {
+    run_part(contents, Record::new)
+}
+
+fn part2(contents: &str) -> usize {
+    run_part(contents, Record::new_from_folded)
+}
+
+fn run_part(contents: &str, factory: impl Fn(&str) -> Record) -> usize {
     contents
         .lines()
         .filter(|l| !l.trim().is_empty())
         .map(|line| {
-            let record = Record::new(line);
-            possibilities(&record.springs, &record.broken_spans)
+            let record = factory(line);
+            let mut cache = PermutationsCache::new();
+            possibilities(&record.springs, &record.broken_spans, &mut cache)
                 .unwrap_or_else(|| panic!("couldn't calculate possibliites for line \"{line}\""))
         })
         .sum()
 }
 
-fn part2(_contents: &str) -> usize {
-    0
-}
-
-#[derive(Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone, Hash)]
 enum SpringCondition {
     Broken,
     Working,
@@ -77,6 +82,20 @@ impl Record {
             broken_spans,
         }
     }
+    fn new_from_folded(line: &str) -> Self {
+        let folded = Self::new(line);
+        let mut springs = folded.springs.clone();
+        let mut broken_spans = folded.broken_spans.clone();
+        for _ in 0..4 {
+            springs.push(SpringCondition::Unknown);
+            springs.extend_from_slice(&folded.springs);
+            broken_spans.extend_from_slice(&folded.broken_spans);
+        }
+        Self {
+            springs,
+            broken_spans,
+        }
+    }
 }
 
 #[allow(dead_code)] // for testing
@@ -87,12 +106,7 @@ fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
         .map(|s| s.len())
         .collect::<Vec<_>>();
     match slots.len().cmp(&broken_spans.len()) {
-        std::cmp::Ordering::Less => {
-            // I think we could be stricter here - e.g. by testing all possible
-            // sub-divisions recursively. This might speed up the algo, but the
-            // following may be good enough to get it working..
-            true
-        }
+        std::cmp::Ordering::Less => true,
         std::cmp::Ordering::Greater => false,
         std::cmp::Ordering::Equal => slots
             .iter()
@@ -101,14 +115,37 @@ fn is_consistent(spring: &[SpringCondition], broken_spans: &[usize]) -> bool {
     }
 }
 
-fn possibilities(slice: &[SpringCondition], broken_spans: &[usize]) -> Option<usize> {
+type PermutationsCache = HashMap<(Vec<SpringCondition>, Vec<usize>), Option<usize>>;
+
+fn cached_possibilities(
+    slice: &[SpringCondition],
+    broken_spans: &[usize],
+    cache: &mut PermutationsCache,
+) -> Option<usize> {
+    // I guess a borrowed slice would be a better choice of key for performance,
+    // but then we would have to deal with the lifetimes
+    let key = (slice.to_vec(), broken_spans.to_vec());
+    if let Some(result) = cache.get(&key) {
+        *result
+    } else {
+        let result = possibilities(slice, broken_spans, cache);
+        cache.insert(key, result);
+        result
+    }
+}
+
+fn possibilities(
+    slice: &[SpringCondition],
+    broken_spans: &[usize],
+    cache: &mut PermutationsCache,
+) -> Option<usize> {
     // eat  whitespace:
     let mut slice = slice;
     while !slice.is_empty() && slice[0] == SpringCondition::Working {
         slice = &slice[1..]
     }
 
-    let start_here = |mut sub_slice: &[SpringCondition]| {
+    let start_here = |mut sub_slice: &[SpringCondition], cache| {
         if sub_slice.len() < broken_spans[0] {
             return None;
         }
@@ -125,7 +162,7 @@ fn possibilities(slice: &[SpringCondition], broken_spans: &[usize]) -> Option<us
                 _ => return None,
             }
         }
-        possibilities(sub_slice, &broken_spans[1..])
+        cached_possibilities(sub_slice, &broken_spans[1..], cache)
     };
 
     if broken_spans.is_empty() {
@@ -142,16 +179,16 @@ fn possibilities(slice: &[SpringCondition], broken_spans: &[usize]) -> Option<us
         match slice[0] {
             SpringCondition::Broken => {
                 // if the first in this group is a broken spring, the remainder must match exactly
-                start_here(slice)
+                start_here(slice, cache)
             }
             SpringCondition::Unknown => {
                 let mut sum_possibilities = 0;
                 // 1. assume broken:
-                if let Some(result) = start_here(slice) {
+                if let Some(result) = start_here(slice, cache) {
                     sum_possibilities += result;
                 }
                 // 2. assume working:
-                if let Some(result) = possibilities(&slice[1..], broken_spans) {
+                if let Some(result) = cached_possibilities(&slice[1..], broken_spans, cache) {
                     sum_possibilities += result;
                 }
                 match sum_possibilities {
@@ -206,9 +243,10 @@ mod test12 {
     fn GIVEN_valid_records_WHEN_counting_possibilities_THEN_correct_answers_returned() {
         let dotest = |line, expected| {
             let record = Record::new(line);
+            let mut cache = PermutationsCache::new();
             assert_eq!(
                 expected,
-                possibilities(&record.springs, &record.broken_spans)
+                possibilities(&record.springs, &record.broken_spans, &mut cache),
             );
         };
         dotest(". 1", None);
@@ -227,6 +265,25 @@ mod test12 {
         dotest("?###???????? 3,2,1", Some(10));
     }
 
+    #[test]
+    fn GIVEN_permutations_cache_WHEN_inserting_keys_from_slices_THEN_caches_correctly() {
+        let mut cache = PermutationsCache::new();
+        let key = (vec![SpringCondition::Broken], vec![1]);
+        cache.insert(key.clone(), Some(234));
+        assert_eq!(cache.get(&key), Some(&Some(234)));
+    }
+
+    #[test]
+    fn GIVEN_recursive_example_WHEN_counting_possibilities_THEN_correct_answer_returned() {
+        // this is actually a performance test - it will basically hang without recurisive caching.
+        let record = Record::new_from_folded("..?.????#?????????? 1,1,1,1,1,4");
+        let mut cache = PermutationsCache::new();
+        assert_eq!(
+            Some(3916284121),
+            possibilities(&record.springs, &record.broken_spans, &mut cache)
+        );
+    }
+
     static EXAMPLE_INPUT: &str = r#"
 ???.### 1,1,3
 .??..??...?##. 1,1,3
@@ -239,5 +296,10 @@ mod test12 {
     #[test]
     fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
         assert_eq!(21, part1(EXAMPLE_INPUT));
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_part2_run_THEN_matches_expected() {
+        assert_eq!(525152, part2(EXAMPLE_INPUT));
     }
 }
