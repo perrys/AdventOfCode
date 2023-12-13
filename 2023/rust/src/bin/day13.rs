@@ -58,38 +58,30 @@ fn transpose(group: Group) -> Group {
     vlines.iter().map(String::from_iter).collect::<Vec<_>>()
 }
 
-fn process_group(horizontal_lines: Group) -> usize {
-    let tester = |lines: &[String]| {
-        'l1: for (idx, line) in lines.iter().enumerate().skip(1) {
-            if *line == lines[idx - 1] {
-                let num = (lines.len() - (idx + 1)).min(idx - 2);
-                for i in 0..num {
-                    let l1 = &lines[idx + i + 1];
-                    let ls = &lines[idx - i - 2];
-                    if l1 != ls {
-                        continue 'l1;
-                    }
+fn test_symmetry(lines: &[String]) -> Option<usize> {
+    'l1: for (idx, line) in lines.iter().enumerate().skip(1) {
+        if *line == lines[idx - 1] {
+            let num = (lines.len() - idx - 1).min(idx - 1);
+            for i in 0..num {
+                let l1 = &lines[idx + i + 1];
+                let ls = &lines[idx - i - 2];
+                if l1 != ls {
+                    continue 'l1;
                 }
-                return Some(idx);
             }
+            return Some(idx);
         }
-        None
-    };
+    }
+    None
+}
 
-    println!("horizontal_lines:");
-    for line in horizontal_lines.iter() {
-        println!("{line}");
-    }
-    if let Some(idx) = tester(&horizontal_lines) {
+fn process_group(horizontal_lines: Group) -> usize {
+    if let Some(idx) = test_symmetry(&horizontal_lines) {
         return idx * 100;
     }
-    println!("vertical:");
     let vertical_lines = transpose(horizontal_lines);
-    for line in vertical_lines.iter() {
-        println!("{line}");
-    }
-    if let Some(idx) = tester(&vertical_lines) {
-        return idx * 100;
+    if let Some(idx) = test_symmetry(&vertical_lines) {
+        return idx;
     }
     panic!("no reflections found");
 }
@@ -98,6 +90,27 @@ fn process_group(horizontal_lines: Group) -> usize {
 #[allow(non_snake_case)]
 mod test13 {
     use super::*;
+
+    #[test]
+    #[rustfmt::skip]
+    fn GIVEN_symmetrical_line_groups_WHEN_testing_symmetry_THEN_correct() {
+        let dotest = |expected, lines: &[&str]| {
+            let owned_lines = lines.iter().map(|&s|s.to_owned()).collect::<Vec<_>>();
+            assert_eq!(expected, test_symmetry(&owned_lines));
+        };
+        dotest(Some(2), &["0000",
+                          "1111",
+                          "1111"]);
+        dotest(Some(3), &["0000",
+                          "1111",
+                          "2222",
+                          "2222",
+                          "1111"]);
+        dotest(None, &["1111",
+                       "2222",
+                       "2222",
+                       "3333"]);
+    }
 
     #[test]
     fn GIVEN_horizontal_lines_WHEN_transposing_THEN_transposed_lines_returned() {
