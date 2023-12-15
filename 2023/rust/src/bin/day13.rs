@@ -66,7 +66,7 @@ fn get_groups(contents: &str) -> Vec<Group> {
     groups
 }
 
-fn transpose<T>(group: &Vec<Vec<T>>) -> Vec<Vec<T>>
+fn transpose<T>(group: &[Vec<T>]) -> Vec<Vec<T>>
 where
     T: Clone,
 {
