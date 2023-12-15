@@ -1,7 +1,7 @@
 //!
-//! Advent of code challenge 2023 day 12.
+//! Advent of code challenge 2023 day 13.
 //!
-//! See <https://adventofcode.com/2023/day/12>
+//! See <https://adventofcode.com/2023/day/13>
 //!
 use std::{cell::Cell, fs};
 
