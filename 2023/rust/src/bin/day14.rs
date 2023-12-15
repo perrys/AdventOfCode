@@ -3,7 +3,7 @@
 //!
 //! See <https://adventofcode.com/2023/day/14>
 //!
-use std::{cell::Cell, fs};
+use std::{cell::Cell, collections::HashMap, fs};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -26,19 +26,39 @@ fn part1(contents: &str) -> usize {
 
 fn part2(contents: &str) -> usize {
     let columns = read_columns(contents);
-    let cycle = || {
+    type CycleMap = HashMap<String, usize>;
+    let mut cycle_map = CycleMap::new();
+    let mut cycle = |cycle_idx, found: bool| {
         columns.iter().for_each(|c| tilt_column(c, true));
         (0..columns[0].len()).for_each(|row_idx| tilt_row(&columns, row_idx, true));
         columns.iter().for_each(|c| tilt_column(c, false));
         (0..columns[0].len()).for_each(|row_idx| tilt_row(&columns, row_idx, false));
-        println!("");
-        print!("{}\n", cols_to_string(&columns));
+        if !found {
+            let key = cols_to_string(&columns);
+            let previous = cycle_map.get(&key);
+            if let Some(&n) = previous {
+                //println!("{n}: {key}");
+                return Some(n);
+            }
+            cycle_map.insert(key, cycle_idx);
+        }
+        None::<usize>
     };
-    for _ in 0..1000 {
-        cycle();
+    let loop_count: usize = 1000000000;
+    let mut cycle_idx = 0;
+    let mut found = false;
+    while cycle_idx < loop_count {
+        if let Some(previous_idx) = cycle(cycle_idx, found) {
+            found = true;
+            let cycle_length = cycle_idx - previous_idx;
+            println!("Found cycle of length {cycle_length} at index {cycle_idx}");
+            let remain = loop_count - cycle_idx;
+            let skips = remain / cycle_length;
+            cycle_idx += skips * cycle_length;
+        }
+        cycle_idx += 1;
     }
-    //columns.iter().map(get_score).sum()
-    0
+    columns.iter().map(get_score).sum()
 }
 
 type Column = Vec<Cell<char>>;
@@ -105,7 +125,7 @@ fn tilt_row(cols: &[Column], row_idx: usize, to_west: bool) {
                 last_stop = if to_west {
                     last_stop + 1
                 } else {
-                    last_stop - 1
+                    last_stop.saturating_sub(1)
                 };
             }
             _ => (),
@@ -136,7 +156,6 @@ fn to_string(col: &Column) -> String {
     String::from_iter(col.iter().map(|c| c.take()))
 }
 
-#[allow(dead_code)] // for testing
 fn cols_to_string(cols: &[Column]) -> String {
     let mut rows: Vec<Vec<char>> = Vec::new();
     for (idx, col) in cols.iter().enumerate() {
