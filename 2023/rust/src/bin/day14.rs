@@ -24,11 +24,14 @@ fn part1(contents: &str) -> usize {
     columns.iter().map(get_score).sum()
 }
 
+static PART2_ITERATIONS: usize = 1_000_000_000;
+
 fn part2(contents: &str) -> usize {
     let columns = read_columns(contents);
     type CycleMap = HashMap<String, usize>;
     let mut cycle_map = CycleMap::new();
     let mut cycle = |cycle_idx, found: bool| {
+        // tilt North, then West, then South, then East:
         columns.iter().for_each(|c| tilt_column(c, true));
         (0..columns[0].len()).for_each(|row_idx| tilt_row(&columns, row_idx, true));
         columns.iter().for_each(|c| tilt_column(c, false));
@@ -37,22 +40,20 @@ fn part2(contents: &str) -> usize {
             let key = cols_to_string(&columns);
             let previous = cycle_map.get(&key);
             if let Some(&n) = previous {
-                //println!("{n}: {key}");
                 return Some(n);
             }
             cycle_map.insert(key, cycle_idx);
         }
         None::<usize>
     };
-    let loop_count: usize = 1000000000;
     let mut cycle_idx = 0;
     let mut found = false;
-    while cycle_idx < loop_count {
+    while cycle_idx < PART2_ITERATIONS {
         if let Some(previous_idx) = cycle(cycle_idx, found) {
             found = true;
             let cycle_length = cycle_idx - previous_idx;
             println!("Found cycle of length {cycle_length} at index {cycle_idx}");
-            let remain = loop_count - cycle_idx;
+            let remain = PART2_ITERATIONS - cycle_idx;
             let skips = remain / cycle_length;
             cycle_idx += skips * cycle_length;
         }
