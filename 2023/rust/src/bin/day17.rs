@@ -23,12 +23,14 @@ fn main() {
 
 fn part1(contents: &str) -> usize {
     let rows = parse(contents);
-    let path = dijkstra_optimal_path(&rows);
+    let path = dijkstra_optimal_path(&rows, 1, 3);
     path.cost
 }
 
-fn part2(_contents: &str) -> usize {
-    0
+fn part2(contents: &str) -> usize {
+    let rows = parse(contents);
+    let path = dijkstra_optimal_path(&rows, 4, 10);
+    path.cost
 }
 
 type Grid = Vec<Vec<usize>>;
@@ -122,11 +124,14 @@ impl PartialOrd for PathElement {
     }
 }
 
-static MAX_STEPS_PER_DIRECTION: usize = 3;
 static NORTHSOUTH: [Direction; 2] = [Direction::North, Direction::South];
 static EASTWEST: [Direction; 2] = [Direction::East, Direction::West];
 
-fn dijkstra_optimal_path(rows: &Grid) -> PathElement {
+fn dijkstra_optimal_path(
+    rows: &Grid,
+    min_steps_per_dir: usize,
+    max_steps_per_dir: usize,
+) -> PathElement {
     type DistanceQueue = BinaryHeap<PathElement>;
     type CostMap = HashMap<(CoOrd, [Direction; 2]), usize>; // 2 separate costs per tile due to direction rules
 
@@ -150,20 +155,22 @@ fn dijkstra_optimal_path(rows: &Grid) -> PathElement {
         'ldir: for dir in current_cheapest.directions.iter() {
             let mut steps_cost = current_cheapest.cost;
             let mut last_step = current_cheapest.position;
-            for _steps in 1..=MAX_STEPS_PER_DIRECTION {
+            for steps in 1..=max_steps_per_dir {
                 if let Some(new_position @ (row, col)) = get_next_block(rows, last_step, *dir) {
                     last_step = new_position;
                     steps_cost += rows[row][col];
-                    let key = (last_step, current_cheapest.directions);
-                    let provisional_cost = *cost_map.get(&key).unwrap_or(&usize::MAX);
-                    if steps_cost < provisional_cost {
-                        cost_map.insert(key, steps_cost);
-                        queue.push(PathElement::new(
-                            steps_cost,
-                            last_step,
-                            other_dir,
-                            Some(Box::new(current_cheapest.clone())),
-                        ));
+                    if steps >= min_steps_per_dir {
+                        let key = (last_step, current_cheapest.directions);
+                        let provisional_cost = *cost_map.get(&key).unwrap_or(&usize::MAX);
+                        if steps_cost < provisional_cost {
+                            cost_map.insert(key, steps_cost);
+                            queue.push(PathElement::new(
+                                steps_cost,
+                                last_step,
+                                other_dir,
+                                Some(Box::new(current_cheapest.clone())),
+                            ));
+                        }
                     }
                 } else {
                     continue 'ldir;
@@ -193,7 +200,7 @@ mod test17 {
     fn GIVEN_small_grid_WHEN_applying_dijkstra_THEN_optimal_paths_returned() {
         let dotest = |grid: &[&str], expected: &[CoOrd]| {
             let rows = parse(grid.join("\n").as_str());
-            let last_elt = dijkstra_optimal_path(&rows);
+            let last_elt = dijkstra_optimal_path(&rows, 1, 3);
             assert_eq!(expected, get_path(&last_elt));
         };
         dotest(&[r"02", "30"], &[(0, 0), (0, 1), (1, 1)]); // 2x2 grid
@@ -209,7 +216,7 @@ mod test17 {
     fn GIVEN_small_grid_WHEN_applying_dijkstra_THEN_correct_path_cost_returned() {
         let dotest = |grid: &[&str], expected| {
             let rows = parse(grid.join("\n").as_str());
-            let last_elt = dijkstra_optimal_path(&rows);
+            let last_elt = dijkstra_optimal_path(&rows, 1, 3);
             assert_eq!(expected, last_elt.cost);
         };
         dotest(&[r"02", "30"], 2); // 2x2 grid
@@ -235,8 +242,11 @@ mod test17 {
 
     #[test]
     fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
-        let rows = parse(EXAMPLE);
-        let last_elt = dijkstra_optimal_path(&rows);
-        assert_eq!(102, last_elt.cost);
+        assert_eq!(102, part1(EXAMPLE));
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_part2_run_THEN_matches_expected() {
+        assert_eq!(94, part2(EXAMPLE));
     }
 }
