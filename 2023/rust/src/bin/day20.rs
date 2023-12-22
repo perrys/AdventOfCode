@@ -25,6 +25,90 @@ fn main() {
 }
 
 fn part1(contents: &str) -> [usize; 2] {
+    let mut modules = read_and_initialize(contents);
+    let mut hi = 0;
+    let mut lo = 0;
+    fn nop(_: &Pulse) {}
+    for _ in 0..1000 {
+        let queue = initialize_queue();
+        let (high, low) = process_queue(&mut modules, queue, &mut nop);
+        hi += high;
+        lo += low;
+    }
+    [hi, lo]
+}
+
+fn part2(contents: &str) -> usize {
+    let mut modules = read_and_initialize(contents);
+
+    // the senders to the last conjunction are all in a cycle starting at
+    // zero. The answer is therefore the lowest common multiple of all of these
+    // cycles.
+    let mut penultimate_modules = Vec::new();
+    for m in modules.values() {
+        if let Module::Conjunction {
+            name: _,
+            last_inputs,
+            outputs,
+        } = m
+        {
+            if *outputs == vec!["rx".to_owned()] {
+                penultimate_modules.extend(last_inputs.keys());
+                break;
+            }
+        }
+    }
+    let mut cycle_map = penultimate_modules
+        .into_iter()
+        .map(|c| (c.clone(), 0usize))
+        .collect::<Vec<_>>();
+    assert!(!cycle_map.is_empty());
+
+    let mut answer = None;
+    for iteration in 1usize.. {
+        let mut callback = |pulse: &Pulse| {
+            let mut hit = false;
+            if pulse.high {
+                if let Some((_, ref mut cycle_length)) =
+                    cycle_map.iter_mut().find(|(name, _)| *name == pulse.sender)
+                {
+                    if *cycle_length == 0 {
+                        *cycle_length = iteration;
+                        hit = true;
+                    }
+                }
+            }
+            if hit && cycle_map.iter().all(|(_, cycle_length)| *cycle_length > 0) {
+                let mut common_multiple: Option<usize> = None;
+                cycle_map.iter().for_each(|&(_, count)| {
+                    common_multiple = match common_multiple {
+                        Some(n) => Some(num::integer::lcm(n, count)),
+                        None => Some(count),
+                    }
+                });
+                answer = common_multiple;
+            }
+        };
+        let queue = initialize_queue();
+        process_queue(&mut modules, queue, &mut callback);
+        if let Some(count) = answer {
+            return count;
+        }
+    }
+    unreachable!();
+}
+
+fn initialize_queue() -> VecDeque<Pulse> {
+    let mut queue = VecDeque::new();
+    queue.push_back(Pulse {
+        high: false,
+        sender: String::new(),
+        destination: "broadcaster".to_owned(),
+    });
+    queue
+}
+
+fn read_and_initialize(contents: &str) -> HashMap<String, Module> {
     let modules = contents
         .lines()
         .filter(|l| !l.trim().is_empty())
@@ -42,35 +126,20 @@ fn part1(contents: &str) -> [usize; 2] {
             outputs: _,
         } => (name.clone(), m),
         Module::Broadcaster { outputs: _ } => ("broadcaster".to_owned(), m),
-        Module::OutputSink => ("output".to_owned(), m),
     }));
     set_conjunction_states(&mut modules);
-    let mut hi = 0;
-    let mut lo = 0;
-    for _ in 0..1000 {
-        let mut queue = VecDeque::new();
-        queue.push_back(Pulse {
-            high: false,
-            sender: String::new(),
-            destination: "broadcaster".to_owned(),
-        });
-        let (high, low) = process_queue(&mut modules, queue);
-        hi += high;
-        lo += low;
-    }
-    [hi, lo]
+    modules
 }
 
 fn set_conjunction_states(modules: &mut HashMap<String, Module>) {
     let mut conjunction_inputs = Vec::new();
     let mut record_connection = |src_name: &String, outputs| {
         for output in outputs {
-            let other = modules.get(output).unwrap_or(&Module::OutputSink);
-            if let Module::Conjunction {
+            if let Some(Module::Conjunction {
                 name,
                 last_inputs: _,
                 outputs: _,
-            } = other
+            }) = modules.get(output)
             {
                 conjunction_inputs.push((src_name.clone(), name.clone()));
             }
@@ -95,7 +164,6 @@ fn set_conjunction_states(modules: &mut HashMap<String, Module>) {
             Module::Broadcaster { outputs } => {
                 record_connection(&"broadcaster".to_owned(), outputs);
             }
-            Module::OutputSink => (),
         }
     }
     for (src, dest) in conjunction_inputs {
@@ -113,10 +181,6 @@ fn set_conjunction_states(modules: &mut HashMap<String, Module>) {
     }
 }
 
-fn part2(_contents: &str) -> i64 {
-    0
-}
-
 #[derive(Debug, Eq, PartialEq)]
 enum Module {
     FlipFlop {
@@ -132,7 +196,6 @@ enum Module {
     Broadcaster {
         outputs: Vec<String>,
     },
-    OutputSink,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -214,14 +277,14 @@ impl Module {
                     });
                 }
             }
-            Module::OutputSink => (),
         }
     }
 }
 
-fn process_queue(
+fn process_queue<T: FnMut(&Pulse)>(
     modules: &mut HashMap<String, Module>,
     mut queue: VecDeque<Pulse>,
+    callback: &mut T,
 ) -> (usize, usize) {
     let mut highs = 0usize;
     let mut lows = 0usize;
@@ -233,6 +296,7 @@ fn process_queue(
             lows += 1
         }
         if let Some(module) = modules.get_mut(&pulse.destination) {
+            callback(&pulse);
             module.pulse(pulse, &mut queue);
         }
     }
