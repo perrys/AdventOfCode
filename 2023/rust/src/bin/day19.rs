@@ -87,7 +87,7 @@ struct Part(HashMap<char, i64>);
 
 impl Part {
     fn new(line: &str) -> Self {
-        assert_eq!(Some('{'), line.chars().nth(0));
+        assert_eq!(Some('{'), line.chars().next());
         assert_eq!(Some('}'), line.chars().last());
         let mut attrs = HashMap::new();
         line[1..line.len() - 1].split(',').for_each(|s| {
@@ -96,7 +96,7 @@ impl Part {
                 .next()
                 .unwrap_or_else(|| panic!("couldn't parse key in {s}"))
                 .chars()
-                .nth(0)
+                .next()
                 .unwrap();
 
             let val = kv
