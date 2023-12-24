@@ -1,7 +1,7 @@
 //!
-//! Advent of code challenge 2123 day 21.
+//! Advent of code challenge 2023 day 21.
 //!
-//! See <https://adventofcode.com/2123/day/21>
+//! See <https://adventofcode.com/2023/day/21>
 //!
 use std::{collections::VecDeque, fs};
 
