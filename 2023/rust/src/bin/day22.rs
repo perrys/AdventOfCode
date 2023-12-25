@@ -3,7 +3,12 @@
 //!
 //! See <https://adventofcode.com/2023/day/22>
 //!
-use std::{cell::Cell, collections::HashMap, fs, ops::RangeInclusive};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet, VecDeque},
+    fs,
+    ops::RangeInclusive,
+};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -36,8 +41,47 @@ fn part1(contents: &str) -> usize {
         .count()
 }
 
-fn part2(_contents: &str) -> usize {
-    0
+fn part2(contents: &str) -> usize {
+    let mut bricks = parse_file(contents);
+    let zmap = drop_bricks_and_return_zmap(&mut bricks);
+    let supports: HashMap<BrickIndex, Vec<BrickIndex>> =
+        HashMap::from_iter(bricks.iter().enumerate().map(|(idx, b)| {
+            let sup = get_supported_bricks(b, &zmap);
+            (idx, sup)
+        }));
+    let supported_by: HashMap<BrickIndex, Vec<BrickIndex>> =
+        HashMap::from_iter(bricks.iter().enumerate().map(|(idx, b)| {
+            let sup = get_supporting_bricks(b, &zmap);
+            (idx, sup)
+        }));
+    (0..bricks.len())
+        .map(|idx| {
+            //let uset = recursive_chain_reaction(vec![idx], &supports, &supported_by);
+            let uset = breadth_first_search(idx, &supports, &supported_by);
+            uset.len() - 1
+        })
+        .sum()
+}
+
+fn breadth_first_search(
+    id: BrickIndex,
+    supports: &HashMap<BrickIndex, Vec<BrickIndex>>,
+    supported_by: &HashMap<BrickIndex, Vec<BrickIndex>>,
+) -> HashSet<BrickIndex> {
+    let mut queue = VecDeque::<BrickIndex>::new();
+    queue.push_back(id);
+    let mut removed = HashSet::<BrickIndex>::new();
+    while !queue.is_empty() {
+        let brick_id = queue.pop_front().unwrap();
+        removed.insert(brick_id);
+        let supported = &supports[&brick_id];
+        for id in supported.iter() {
+            if supported_by[id].iter().all(|b| removed.contains(b)) {
+                queue.push_back(*id);
+            }
+        }
+    }
+    removed
 }
 
 fn parse_file(contents: &str) -> Vec<Brick> {
@@ -268,6 +312,11 @@ mod test22 {
     #[test]
     fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
         assert_eq!(5, part1(EXAMPLE));
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_part2_run_THEN_matches_expected() {
+        assert_eq!(7, part2(EXAMPLE));
     }
 
     static EXAMPLE: &str = r#"
