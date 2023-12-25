@@ -19,36 +19,23 @@ fn main() {
 }
 
 fn part1(contents: &str) -> usize {
-    let bricks = parse_file(contents);
-    let maxx = bricks.iter().fold(usize::MIN, |a, b| *b.x.end().max(&a));
-    let maxy = bricks.iter().fold(usize::MIN, |a, b| *b.y.end().max(&a));
-    println!("{maxx}, {maxy}");
-    // let map = map_z_values(&bricks);
+    let mut bricks = parse_file(contents);
+    let zmap = drop_bricks_and_return_zmap(&mut bricks);
     bricks
         .iter()
         .filter(|&brick| {
             let mut okay = true;
-            // if brick.z.get().start() == brick.z.end() {
-            //     'l1: for x in brick.x.clone() {
-            //         for y in brick.y.clone() {
-            //             if map[&(x, y)].last().expect("empty stack").0 > *brick.z.end() {
-            //                 okay = false;
-            //                 break 'l1;
-            //             }
-            //         }
-            //     }
-            // } else if map[&(*brick.x.end(), *brick.y.end())]
-            //     .last()
-            //     .expect("empty stack")
-            //     .0
-            //     > *brick.z.end()
-            // {
-            //     okay = false;
-            // }
+            for idx in get_supported_bricks(brick, &zmap).iter() {
+                if get_supporting_bricks(&bricks[*idx], &zmap).len() == 1 {
+                    okay = false;
+                    break;
+                }
+            }
             okay
         })
         .count()
 }
+
 fn part2(_contents: &str) -> usize {
     0
 }
@@ -62,6 +49,8 @@ fn parse_file(contents: &str) -> Vec<Brick> {
     result.sort_by_key(|b| b.z_hi.get());
     result
 }
+
+type XYCoord = (usize, usize);
 
 #[derive(Debug, Eq, PartialEq)]
 struct Brick {
@@ -101,84 +90,182 @@ impl Brick {
             z_hi: Cell::new(*z.end()),
         }
     }
+
+    fn iter_xy(&self) -> impl Iterator<Item = XYCoord> {
+        XYIter::new(self.x.clone(), self.y.clone())
+    }
 }
 
-fn drop_bricks(bricks: &mut [Brick]) -> HashMap<(usize, usize), Vec<(usize, &Brick)>> {
-    let mut map: HashMap<(usize, usize), Vec<(usize, &Brick)>> = HashMap::new();
+struct XYIter<T>
+where
+    T: IntoIterator<Item = usize>,
+{
+    x_iter: T::IntoIter,
+    y_iter: T::IntoIter,
+    last_x: Option<usize>,
+    y_range: T,
+}
+
+impl<T> XYIter<T>
+where
+    T: IntoIterator<Item = usize> + Clone,
+{
+    fn new(xrange: T, y_range: T) -> Self {
+        let mut x_iter = xrange.into_iter();
+        let last_x = x_iter.next();
+        Self {
+            x_iter,
+            last_x,
+            y_iter: y_range.clone().into_iter(),
+            y_range,
+        }
+    }
+}
+
+impl<T> Iterator for XYIter<T>
+where
+    T: IntoIterator<Item = usize> + Clone,
+{
+    type Item = XYCoord;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(x) = self.last_x {
+            if let Some(y) = self.y_iter.next() {
+                return Some((x, y));
+            } else {
+                self.last_x = self.x_iter.next();
+                self.y_iter = self.y_range.clone().into_iter();
+            }
+        }
+        None
+    }
+}
+
+type BrickIndex = usize;
+type ZStack = Vec<(RangeInclusive<usize>, BrickIndex)>;
+
+fn drop_bricks_and_return_zmap(bricks: &mut [Brick]) -> HashMap<XYCoord, ZStack> {
+    let mut map: HashMap<XYCoord, ZStack> = HashMap::new();
     for (idx, brick) in bricks.iter().enumerate() {
         let mut max_z = 0usize;
-        for x in brick.x.clone() {
-            for y in brick.y.clone() {
-                if let Some(stack) = &map.get(&(x, y)) {
-                    let z = stack.last().unwrap().0;
-                    max_z = max_z.max(z);
-                }
+        for (x, y) in brick.iter_xy() {
+            if let Some(stack) = &map.get(&(x, y)) {
+                let z = stack.last().unwrap().0.end();
+                max_z = max_z.max(*z);
             }
         }
         brick.z_hi.set(max_z + brick.z_len);
-        for x in brick.x.clone() {
-            for y in brick.y.clone() {
-                let stack = map.entry((x, y)).or_default();
-                stack.push((max_z + 1, brick));
-            }
+        for (x, y) in brick.iter_xy() {
+            let stack = map.entry((x, y)).or_default();
+            let lo = 1 + brick.z_hi.get() - brick.z_len;
+            stack.push((lo..=brick.z_hi.get(), idx));
         }
     }
     map
 }
 
-// fn map_z_values<'a>(bricks: &'a [Brick]) -> HashMap<(usize, usize), Vec<(usize, &'a Brick)>> {
-//     let mut map = HashMap::new();
-//     for brick in bricks {
-//         for x in brick.x.clone() {
-//             for y in brick.y.clone() {
-//                 for z in brick.z.clone() {
-//                     let stack = map
-//                         .entry((x, y))
-//                         .or_insert_with(Vec::<(usize, &Brick)>::new);
-//                     stack.push((z, brick));
-//                 }
-//             }
-//         }
-//     }
-//     for stack in map.values_mut() {
-//         stack.sort_by_key(|k| k.0);
-//     }
-//     map
-// }
+fn get_supported_bricks(brick: &Brick, zmap: &HashMap<XYCoord, ZStack>) -> Vec<BrickIndex> {
+    let mut ids = Vec::new();
+    for xy in brick.iter_xy() {
+        if let Some(stack) = zmap.get(&xy) {
+            if let Some((_z, idx)) = stack
+                .iter()
+                .find(|(z, _idx)| *z.start() == brick.z_hi.get() + 1)
+            {
+                ids.push(*idx);
+            }
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn get_supporting_bricks(brick: &Brick, zmap: &HashMap<XYCoord, ZStack>) -> Vec<BrickIndex> {
+    let mut ids = Vec::new();
+    for xy in brick.iter_xy() {
+        if let Some(stack) = zmap.get(&xy) {
+            if let Some((_z, idx)) = stack
+                .iter()
+                .find(|(z, _idx)| *z.end() == brick.z_hi.get() - brick.z_len)
+            {
+                ids.push(*idx);
+            }
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
 
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod test22 {
+    use std::collections::HashSet;
+
     use super::*;
 
-    // #[test]
-    // fn GIVEN_small_brick_set_WHEN_mapping_z_values_THEN_correct_map_produced() {
-    //     let dotest = |lines, expected: Vec<((usize, usize), Vec<(usize, usize)>)>| {
-    //         let bricks = parse_file(lines);
-    //         let make_entry = |(c, v): ((usize, usize), Vec<(usize, usize)>)| {
-    //             let refvec = v
-    //                 .iter()
-    //                 .map(|(z, idx)| (*z, &bricks[*idx]))
-    //                 .collect::<Vec<_>>();
-    //             (c, refvec)
-    //         };
-    //         let exmap = HashMap::from_iter(expected.into_iter().map(make_entry));
-    //         assert_eq!(exmap, map_z_values(&bricks));
-    //     };
-    //     // single stack
-    //     dotest("1,1,1~1,1,2", vec![((1, 1), vec![(1, 0), (2, 0)])]);
-    //     // stacked bricks, requires z-sorting
-    //     dotest(
-    //         "1,1,6~2,1,6\n1,1,1~1,1,2",
-    //         vec![
-    //             ((1, 1), vec![(1, 0), (2, 0), (6, 1)]),
-    //             ((2, 1), vec![(6, 1)]),
-    //         ],
-    //     );
-    // }
+    #[test]
+    fn GIVEN_small_brick_set_WHEN_dropping_bricks_THEN_correct_zmap_produced() {
+        let dotest = |lines, expected: Vec<(XYCoord, ZStack)>| {
+            let mut bricks = parse_file(lines);
+            let zmap = drop_bricks_and_return_zmap(&mut bricks);
+            let exmap = HashMap::from_iter(expected);
+            assert_eq!(exmap, zmap);
+        };
+        // single stack
+        dotest("1,1,1~1,1,2", vec![((1, 1), vec![(1..=2, 0)])]);
+        // stacked bricks, requires z-sorting
+        dotest(
+            "1,1,6~2,1,6\n1,1,1~1,1,2",
+            vec![
+                ((1, 1), vec![(1..=2, 0), (3..=3, 1)]),
+                ((2, 1), vec![(3..=3, 1)]),
+            ],
+        );
+    }
 
     #[test]
-    #[ignore]
+    fn GIVEN_XYIter_WHEN_iterating_THEN_x_and_y_iterated() {
+        let xrange = 0..2;
+        let yrange = 4..6;
+        let mut xy = XYIter::new(xrange, yrange);
+        assert_eq!(Some((0, 4)), xy.next());
+        assert_eq!(Some((0, 5)), xy.next());
+        assert_eq!(Some((1, 4)), xy.next());
+        assert_eq!(Some((1, 5)), xy.next());
+        assert_eq!(None, xy.next());
+    }
+
+    #[test]
+    fn GIVEN_small_brick_set_WHEN_getting_supported_bricks_THEN_correct_bricks_returned() {
+        let mut bricks = parse_file(EXAMPLE);
+        let zmap = drop_bricks_and_return_zmap(&mut bricks);
+        let dotest = |brick, expected: &[usize]| {
+            let result: HashSet<usize> = HashSet::from_iter(get_supported_bricks(brick, &zmap));
+            let expected = HashSet::from_iter(expected.iter().copied());
+            assert_eq!(expected, result);
+        };
+        dotest(&bricks[0], &[1, 2]); // example A supports B and C
+        dotest(&bricks[1], &[3, 4]); // example B supports D and E
+        dotest(&bricks[6], &[]); // example G supports nothing
+    }
+
+    #[test]
+    fn GIVEN_small_brick_set_WHEN_getting_supporting_bricks_THEN_correct_bricks_returned() {
+        let mut bricks = parse_file(EXAMPLE);
+        let zmap = drop_bricks_and_return_zmap(&mut bricks);
+        let dotest = |brick, expected: &[usize]| {
+            let result: HashSet<usize> = HashSet::from_iter(get_supporting_bricks(brick, &zmap));
+            let expected = HashSet::from_iter(expected.iter().copied());
+            assert_eq!(expected, result);
+        };
+        dotest(&bricks[1], &[0]); // example B supported by A
+        dotest(&bricks[3], &[1, 2]); // example D supported by B and C
+        dotest(&bricks[6], &[5]); // example G supported by F
+    }
+
+    #[test]
     fn GIVEN_aoc_example_WHEN_part1_run_THEN_matches_expected() {
         assert_eq!(5, part1(EXAMPLE));
     }
