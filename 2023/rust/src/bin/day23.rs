@@ -104,37 +104,13 @@ type RowAndCol = (usize, usize);
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct PathElement {
     position: RowAndCol,
-    previous: Option<Box<PathElement>>,
+    previous: Vec<RowAndCol>,
     cost: usize,
 }
 
 impl PathElement {
     fn is_previous_step(&self, coord: RowAndCol) -> bool {
-        // this has horrible cache performance and really slows down the BFS in
-        // part2. It would certainly be much faster if these were stored in a
-        // Vec.
-        let mut elt = &self.previous;
-        while let Some(e) = elt {
-            if e.position == coord {
-                return true;
-            }
-            elt = &e.previous;
-        }
-        false
-    }
-    #[allow(dead_code)] // for debugging
-    fn to_string(&self) -> String {
-        let mut result = format!("{:?}, {} ", self.position, self.cost).to_owned();
-        if self.previous.is_none() {
-            return result;
-        }
-        let mut prev = self.previous.as_ref().unwrap();
-        result = format!("{:?}, {} ", prev.position, prev.cost).to_owned() + &result;
-        while let Some(p) = &prev.previous {
-            prev = p;
-            result = format!("{:?}, {} ", prev.position, prev.cost).to_owned() + &result;
-        }
-        result
+        self.previous.contains(&coord)
     }
 }
 
@@ -237,7 +213,7 @@ where
     queue.push(PathElement {
         position: start,
         cost: 0,
-        previous: None,
+        previous: Vec::new(),
     });
 
     let mut candidate_paths = Vec::new();
@@ -261,8 +237,10 @@ where
             let provisional_cost = *cost_map.get(&new_position).unwrap_or(&usize::MIN);
             if steps_cost > provisional_cost {
                 cost_map.insert(new_position, steps_cost);
+                let mut prev = current.previous.clone();
+                prev.push(current.position);
                 queue.push(PathElement {
-                    previous: Some(Box::new(current.clone())),
+                    previous: prev,
                     position: new_position,
                     cost: steps_cost,
                 });
@@ -283,7 +261,7 @@ fn breadth_first_search(
     queue.push_back(PathElement {
         position: start,
         cost: 0,
-        previous: None,
+        previous: Vec::new(),
     });
 
     let mut candidate_paths = Vec::new();
@@ -303,8 +281,10 @@ fn breadth_first_search(
                 continue 'l1;
             }
             steps_cost += cost;
+            let mut prev = current.previous.clone();
+            prev.push(current.position);
             queue.push_back(PathElement {
-                previous: Some(Box::new(current.clone())),
+                previous: prev,
                 position: new_position,
                 cost: steps_cost,
             });
@@ -350,17 +330,6 @@ fn get_valid_neighbours(grid: &Grid, tile: RowAndCol, st: SlopeTreatment) -> Vec
 mod test23 {
     use super::*;
 
-    fn get_path(last_elt: &PathElement) -> Vec<RowAndCol> {
-        let mut elt = last_elt;
-        let mut elts = Vec::new();
-        elts.push(elt.position);
-        while let Some(e) = &elt.previous {
-            elts.push(e.position);
-            elt = e;
-        }
-        elts.into_iter().rev().collect::<Vec<_>>()
-    }
-
     #[test]
     fn GIVEN_small_grid_WHEN_applying_dijkstra_THEN_optimal_paths_returned() {
         let dotest = |grid: &[&str], expected: &[RowAndCol]| {
@@ -372,7 +341,9 @@ mod test23 {
                 |grid, tile| get_valid_neighbours(grid, tile, SlopeTreatment::Normal),
             )
             .expect("no path to target");
-            assert_eq!(expected, get_path(&last_elt));
+            let mut list = last_elt.previous.clone();
+            list.push(last_elt.position);
+            assert_eq!(expected, list);
         };
         dotest(&[r"#.", ".."], &[(0, 1), (1, 1), (1, 0)]); // 2x2 grid
         dotest(
