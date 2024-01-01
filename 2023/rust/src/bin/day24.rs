@@ -1,7 +1,7 @@
 //!
-//! Advent of code challenge 2024 day 24.
+//! Advent of code challenge 2023 day 24.
 //!
-//! See <https://adventofcode.com/2024/day/24>
+//! See <https://adventofcode.com/2023/day/24>
 //!
 extern crate nalgebra as na;
 use na::{SMatrix, Vector6};
@@ -162,17 +162,17 @@ fn calculate_intersection_trajectory(hailstones: Vec<HailStone>) -> (Vec3D, Vec3
     println!("matrix_a: {matrix_a}");
     println!("vector_b: {vector_b}");
     let decomp = matrix_a.lu();
-    let vector_a = decomp.solve(&vector_b).expect("no solution found");
-    println!("result: {vector_a}");
+    let vector_x = decomp.solve(&vector_b).expect("no solution found");
+    println!("result: {vector_x}");
     let position = Vec3D {
-        x: vector_a[0],
-        y: vector_a[1],
-        z: vector_a[2],
+        x: vector_x[0],
+        y: vector_x[1],
+        z: vector_x[2],
     };
     let velocity = Vec3D {
-        x: vector_a[3],
-        y: vector_a[4],
-        z: vector_a[5],
+        x: vector_x[3],
+        y: vector_x[4],
+        z: vector_x[5],
     };
     (position, velocity)
 }
