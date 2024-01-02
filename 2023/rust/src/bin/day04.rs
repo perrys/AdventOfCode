@@ -18,6 +18,39 @@ fn main() {
     println!("part2 total is {}", part2(contents.as_str()));
 }
 
+fn part1(content: &str) -> usize {
+    content
+        .lines()
+        .filter(|&s| !s.trim().is_empty())
+        .map(count_winning_cards)
+        .map(|n| match n {
+            _ if n > 0 => 2_usize.pow((n - 1) as u32),
+            _ => 0,
+        })
+        .sum()
+}
+
+fn part2(content: &str) -> usize {
+    let card_scores = content
+        .lines()
+        .filter(|&s| !s.trim().is_empty())
+        .map(count_winning_cards)
+        .collect::<Vec<_>>();
+    // iterate down the list of scratchcards and increase the card count for
+    // each card according to the number of wins on the current card. Initially
+    // we have 1 copy of each card:
+    let mut card_counts = vec![1; card_scores.len()];
+    let trunc_scores = &card_scores[0..(card_scores.len() - 1)];
+    for (idx, score) in trunc_scores.iter().enumerate() {
+        let this_card_count = card_counts[idx];
+        let next_cards = &mut card_counts[idx + 1..(idx + 1 + *score)];
+        for num in next_cards.iter_mut() {
+            *num += this_card_count;
+        }
+    }
+    card_counts.iter().sum()
+}
+
 fn split_line(line: &str) -> [&str; 2] {
     let prefix = line.find(": ").expect("Couldn't find first colon");
     line[1 + prefix..]
@@ -28,7 +61,7 @@ fn split_line(line: &str) -> [&str; 2] {
         .expect("didn't split into 2 parts")
 }
 
-fn parse_line(line: &str) -> usize {
+fn count_winning_cards(line: &str) -> usize {
     let [winning_nums, my_nums] = split_line(line);
     let mut winning_nums = winning_nums
         .split(' ')
@@ -54,38 +87,6 @@ fn parse_line(line: &str) -> usize {
     total
 }
 
-fn part1(content: &str) -> usize {
-    content
-        .lines()
-        .filter(|&s| !s.trim().is_empty())
-        .map(parse_line)
-        .map(|n| {
-            if n > 0 {
-                2_usize.pow((n - 1) as u32)
-            } else {
-                0
-            }
-        })
-        .sum()
-}
-fn part2(content: &str) -> usize {
-    let card_scores = content
-        .lines()
-        .filter(|&s| !s.trim().is_empty())
-        .map(parse_line)
-        .collect::<Vec<_>>();
-    let mut num_cards = vec![1; card_scores.len()];
-    let trunc_scores = &card_scores[0..(card_scores.len() - 1)];
-    for (idx, score) in trunc_scores.iter().enumerate() {
-        let this_card_count = num_cards[idx];
-        let next_cards = &mut num_cards[idx + 1..(idx + 1 + *score)];
-        for num in next_cards.iter_mut() {
-            *num += this_card_count;
-        }
-    }
-    num_cards.iter().sum()
-}
-
 #[allow(non_snake_case)]
 #[cfg(test)]
 mod tester {
@@ -100,9 +101,9 @@ mod tester {
     }
 
     #[test]
-    fn GIVEN_valid_lines_WHEN_run_part1_parse_THEN_expected_total_returned() {
+    fn GIVEN_valid_lines_WHEN_counting_winners_THEN_expected_total_returned() {
         let dotest = |line, expected| {
-            assert_eq!(expected, parse_line(line));
+            assert_eq!(expected, count_winning_cards(line));
         };
         dotest("c1: 12 34 | 45 67 ", 0);
         dotest("c1: 12 34 | 12 34 ", 2);

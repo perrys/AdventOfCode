@@ -29,18 +29,18 @@ fn part1(content: &str) -> i64 {
     );
     let mut mapped = seeds.clone();
     let mut mappings = Mappings(Vec::new());
-    let proc = |mapped: &Vec<_>, mappings: &Mappings| {
+    let process_mapping = |mapped: &Vec<_>, mappings: &Mappings| {
         mapped.iter().map(|&val| mappings.map(val)).collect()
     };
     for line in lines {
         if line.contains("map:") {
-            mapped = proc(&mapped, &mappings);
+            mapped = process_mapping(&mapped, &mappings);
             mappings.0.clear();
         } else {
             mappings.0.push(Mapping::new(line));
         }
     }
-    mapped = proc(&mapped, &mappings);
+    mapped = process_mapping(&mapped, &mappings);
     *mapped.iter().min().expect("no seeds provided")
 }
 
