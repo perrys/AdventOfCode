@@ -13,12 +13,19 @@ fn main() {
 }
 
 fn part1(contents: &str) -> usize {
+    find_distinct_set(contents, 4)
+}
+
+fn part2(contents: &str) -> usize {
+    find_distinct_set(contents, 14)
+}
+
+fn find_distinct_set(contents: &str, test_length: usize) -> usize {
     let buffer = contents.as_bytes();
-    const BUFFSIZE: usize = 4;
 
     let tester = |buf_idx: usize| -> bool {
         let mut bit_table: u64 = 0;
-        for idx in 0..BUFFSIZE {
+        for idx in 0..test_length {
             let ch = buffer[buf_idx + idx];
             let mask = get_mask(ch);
             if (mask & bit_table) > 0 {
@@ -28,9 +35,9 @@ fn part1(contents: &str) -> usize {
         }
         true
     };
-    for buf_idx in 0..buffer.len() - BUFFSIZE {
+    for buf_idx in 0..buffer.len() - test_length {
         if tester(buf_idx) {
-            return buf_idx + BUFFSIZE;
+            return buf_idx + test_length;
         }
     }
     panic!("not found");
@@ -39,10 +46,6 @@ fn part1(contents: &str) -> usize {
 fn get_mask(ch: u8) -> u64 {
     let position = ch % 64;
     1 << position
-}
-
-fn part2(_contents: &str) -> usize {
-    0
 }
 
 #[cfg(test)]
@@ -57,5 +60,14 @@ mod test06 {
         assert_eq!(6, part1("nppdvjthqldpwncqszvftbrmjlhg"));
         assert_eq!(10, part1("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"));
         assert_eq!(11, part1("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"));
+    }
+
+    #[test]
+    fn GIVEN_aoc_example_WHEN_running_part_2_THEN_expected_answers_returned() {
+        assert_eq!(19, part2("mjqjpqmgbljsphdztnvjfqwrcgsmlb"));
+        assert_eq!(23, part2("bvwbjplbgvbhsrlpgdmjqwftvncz"));
+        assert_eq!(23, part2("nppdvjthqldpwncqszvftbrmjlhg"));
+        assert_eq!(29, part2("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"));
+        assert_eq!(26, part2("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"));
     }
 }
