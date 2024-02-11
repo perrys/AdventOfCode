@@ -15,10 +15,8 @@ fn main() {
 
 fn part1(contents: &str) -> usize {
     static THRESHOLD: usize = 100000;
-    let mut parser = Reader { cwd: Vec::new() };
-    for line in contents.lines().filter(|line| !line.trim().is_empty()) {
-        parser.parse_line(line);
-    }
+
+    let root = parse_file(contents);
 
     let mut answer: usize = 0;
     fn walk(node: &DirNode, answer: &mut usize) -> usize {
@@ -34,12 +32,33 @@ fn part1(contents: &str) -> usize {
         }
         total
     }
-    walk(&parser.cwd[0], &mut answer);
+    walk(&root, &mut answer);
     answer
 }
 
-fn part2(_contents: &str) -> usize {
-    0
+fn part2(contents: &str) -> usize {
+    static TOTAL_BYTES: usize = 70000000;
+    static TARGET_BYTES: usize = 30000000;
+    let root = parse_file(contents);
+    fn walk(node: &DirNode, sizes: &mut Vec<usize>) -> usize {
+        let mut total: usize = 0;
+        for subdir in node.borrow().subdirs.iter() {
+            total += walk(subdir, sizes);
+        }
+        for file in node.borrow().files.iter() {
+            total += file.1;
+        }
+        sizes.push(total);
+        total
+    }
+    let mut sizes: Vec<usize> = Vec::new();
+    let root_size = walk(&root, &mut sizes);
+    let required_space = TARGET_BYTES - (TOTAL_BYTES - root_size);
+    let candidates = sizes
+        .into_iter()
+        .filter(|n| *n > required_space)
+        .collect::<Vec<_>>();
+    *candidates.iter().min().unwrap()
 }
 
 type DirNode = Rc<RefCell<Directory>>;
@@ -62,10 +81,13 @@ impl Directory {
 }
 
 struct Reader {
-    cwd: Vec<DirNode>,
+    dir_stack: Vec<DirNode>,
 }
 
 impl Reader {
+    fn get_root(self) -> DirNode {
+        self.dir_stack[0].clone()
+    }
     fn parse_line(&mut self, line: &str) {
         let toks = line
             .split(' ')
@@ -77,7 +99,7 @@ impl Reader {
             size_str => {
                 let filename = toks[1];
                 let size = size_str.parse::<usize>();
-                let working_dir = self.cwd.last().expect("working directory unset");
+                let working_dir = self.dir_stack.last().expect("working directory unset");
                 let mut working_dir = working_dir.borrow_mut();
                 working_dir.files.push((
                     filename.to_string(),
@@ -92,16 +114,16 @@ impl Reader {
             "cd" => match toks[1] {
                 "/" => {
                     let rootdir = Directory::new("<root>");
-                    self.cwd.push(rootdir);
+                    self.dir_stack.push(rootdir);
                 }
                 ".." => {
-                    self.cwd.pop();
+                    self.dir_stack.pop();
                 }
                 subdir_name => {
                     let subdir = Directory::new(subdir_name);
-                    self.cwd.push(subdir.clone());
-                    let len = self.cwd.len();
-                    let working_dir = &self.cwd[len - 2];
+                    self.dir_stack.push(subdir.clone());
+                    let len = self.dir_stack.len();
+                    let working_dir = &self.dir_stack[len - 2];
                     let mut working_dir = working_dir.borrow_mut();
                     working_dir.subdirs.push(subdir);
                 }
@@ -114,6 +136,16 @@ impl Reader {
     }
 }
 
+fn parse_file(contents: &str) -> Rc<RefCell<Directory>> {
+    let mut parser = Reader {
+        dir_stack: Vec::new(),
+    };
+    for line in contents.lines().filter(|line| !line.trim().is_empty()) {
+        parser.parse_line(line);
+    }
+    parser.get_root()
+}
+
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod tester {
@@ -121,29 +153,31 @@ mod tester {
 
     #[test]
     fn GIVEN_initial_commands_WHEN_reader_parsing_THEN_state_changes_as_expected() {
-        let mut parser = Reader { cwd: Vec::new() };
-        assert_eq!(0, parser.cwd.len());
+        let mut parser = Reader {
+            dir_stack: Vec::new(),
+        };
+        assert_eq!(0, parser.dir_stack.len());
         parser.parse_line("$ cd /");
-        assert_eq!(1, parser.cwd.len());
+        assert_eq!(1, parser.dir_stack.len());
         {
-            let dir = parser.cwd.last().unwrap();
+            let dir = parser.dir_stack.last().unwrap();
             assert_eq!("<root>", dir.borrow().name);
             assert_eq!(0, dir.borrow().files.len());
         }
         parser.parse_line("126880 fmftdzrp.fwt");
         {
-            let dir = parser.cwd.last().unwrap();
+            let dir = parser.dir_stack.last().unwrap();
             assert_eq!(1, dir.borrow().files.len()); //
             assert_eq!(126880, dir.borrow().files[0].1);
             assert_eq!("fmftdzrp.fwt", dir.borrow().files[0].0);
         }
         parser.parse_line("$ cd a");
         parser.parse_line("29116 f");
-        assert_eq!(2, parser.cwd.len());
+        assert_eq!(2, parser.dir_stack.len());
         {
-            let root = parser.cwd.first().unwrap();
+            let root = parser.dir_stack.first().unwrap();
             assert_eq!(1, root.borrow().subdirs.len());
-            let dir = parser.cwd.last().unwrap();
+            let dir = parser.dir_stack.last().unwrap();
             assert_eq!("a", dir.borrow().name);
             assert_eq!(1, dir.borrow().files.len()); //
             assert_eq!(29116, dir.borrow().files[0].1);
@@ -179,5 +213,9 @@ $ ls
     #[test]
     fn GIVEN_aoc_example_WHEN_running_part_1_THEN_expected_answers_returned() {
         assert_eq!(95437, part1(EXAMPLE));
+    }
+    #[test]
+    fn GIVEN_aoc_example_WHEN_running_part_2_THEN_expected_answers_returned() {
+        assert_eq!(24933642, part2(EXAMPLE));
     }
 }
