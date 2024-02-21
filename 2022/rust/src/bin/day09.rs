@@ -13,6 +13,27 @@ fn main() {
 }
 
 fn part1(contents: &str) -> usize {
+    solve::<2>(contents)
+}
+
+fn part2(contents: &str) -> usize {
+    solve::<10>(contents)
+}
+
+fn solve<const N: usize>(contents: &str) -> usize {
+    let instructions = parse_instructions(contents);
+    let mut rope = Rope::<N>::new();
+    let mut tail_visited = HashSet::<(i32, i32)>::new();
+    for instruction in instructions {
+        for _ in 0..instruction.1 {
+            rope.move_head(instruction.0);
+            tail_visited.insert(rope.vertices[N - 1]);
+        }
+    }
+    tail_visited.len()
+}
+
+fn parse_instructions(contents: &str) -> Vec<(Direction, usize)> {
     let instructions = contents
         .lines()
         .filter(|l| !l.trim().is_empty())
@@ -23,19 +44,7 @@ fn part1(contents: &str) -> usize {
             (dir, len)
         })
         .collect::<Vec<_>>();
-    let mut rope = Rope::new();
-    let mut visited = HashSet::<(i32, i32)>::new();
-    for instruction in instructions {
-        for _ in 0..instruction.1 {
-            rope.move_head(instruction.0);
-            visited.insert(rope.tail_pos);
-        }
-    }
-    visited.len()
-}
-
-fn part2(_contents: &str) -> usize {
-    0
+    instructions
 }
 
 #[derive(Copy, Debug, Clone)]
@@ -58,39 +67,44 @@ impl Direction {
     }
 }
 
-struct Rope {
-    head_pos: (i32, i32),
-    tail_pos: (i32, i32),
+struct Rope<const N: usize> {
+    vertices: [(i32, i32); N],
 }
 
-impl Rope {
+impl<const N: usize> Rope<N> {
     fn new() -> Self {
-        Rope {
-            head_pos: (0, 0),
-            tail_pos: (0, 0),
-        }
+        let vertices = [(0, 0); N];
+        Self { vertices }
     }
 
     fn move_head(&mut self, dir: Direction) {
+        let head_pos = &mut self.vertices[0];
         match dir {
-            Direction::L => self.head_pos.0 -= 1,
-            Direction::R => self.head_pos.0 += 1,
-            Direction::U => self.head_pos.1 -= 1,
-            Direction::D => self.head_pos.1 += 1,
+            Direction::L => head_pos.0 -= 1,
+            Direction::R => head_pos.0 += 1,
+            Direction::U => head_pos.1 -= 1,
+            Direction::D => head_pos.1 += 1,
         }
         self.move_tail();
     }
 
     fn move_tail(&mut self) {
-        let dx = self.head_pos.0 - self.tail_pos.0;
-        let dy = self.head_pos.1 - self.tail_pos.1;
-        if dx.abs() > 1 {
-            self.tail_pos.1 = self.head_pos.1;
-            self.tail_pos.0 += dx / 2;
-        }
-        if dy.abs() > 1 {
-            self.tail_pos.0 = self.head_pos.0;
-            self.tail_pos.1 += dy / 2;
+        for i in 1..N {
+            let head_pos = self.vertices[i - 1];
+            let tail_pos = &mut self.vertices[i];
+
+            let dx = head_pos.0 - tail_pos.0;
+            let dy = head_pos.1 - tail_pos.1;
+            if dx.abs() > 1 && dy.abs() > 1 {
+                tail_pos.0 += dx / dx.abs();
+                tail_pos.1 += dy / dy.abs();
+            } else if dx.abs() > 1 {
+                tail_pos.0 += dx / 2;
+                tail_pos.1 = head_pos.1;
+            } else if dy.abs() > 1 {
+                tail_pos.0 = head_pos.0;
+                tail_pos.1 += dy / 2;
+            }
         }
     }
 }
@@ -113,5 +127,23 @@ R 2
     #[test]
     fn GIVEN_aoc_example_WHEN_running_part_1_THEN_expected_answers_returned() {
         assert_eq!(13, part1(EXAMPLE));
+    }
+    #[test]
+    fn GIVEN_aoc_example_WHEN_running_part_2_THEN_expected_answers_returned() {
+        assert_eq!(1, part2(EXAMPLE));
+    }
+    static EXAMPLE2: &str = r#"
+R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20
+"#;
+    #[test]
+    fn GIVEN_aoc_example2_WHEN_running_part_2_THEN_expected_answers_returned() {
+        assert_eq!(36, part2(EXAMPLE2));
     }
 }
