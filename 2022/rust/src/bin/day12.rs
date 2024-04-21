@@ -14,14 +14,39 @@ fn main() {
 
 fn part1(_contents: &str) -> usize {
     let (grid, start_tile) = parse(_contents);
-    dijkstra(grid, start_tile)
+    dijkstra(&grid, start_tile).expect("no path to end tile")
 }
 
 fn part2(_contents: &str) -> usize {
-    0
+    let (mut grid, _start_tile) = parse(_contents);
+    let start_candidates = grid
+        .tiles
+        .iter()
+        .filter_map(
+            |tile| {
+                if tile.borrow().height == 0 {
+                    Some(tile.clone())
+                } else {
+                    None
+                }
+            },
+        )
+        .collect::<Vec<_>>();
+    // there's probably a smarter way to do this where the start points are
+    // connected to each other in groups. The following is a brute-force, from
+    // scratch search from each start candidate, and takes a second or two for
+    // the full puzzle input:
+    start_candidates
+        .into_iter()
+        .filter_map(|start_tile| {
+            grid.reset(&start_tile);
+            dijkstra(&grid, start_tile)
+        })
+        .min()
+        .expect("unable to find minimum path")
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum TileType {
     Start,
     End,
@@ -109,6 +134,7 @@ impl Grid {
             .filter(|neighbor| (neighbor.borrow().height as i16 - tile.borrow().height as i16) <= 1)
             .collect()
     }
+
     fn at(&self, loc: &Coord) -> Option<SharedTile> {
         if loc.row >= self.n_rows {
             return None;
@@ -116,6 +142,18 @@ impl Grid {
         let n_cols = self.tiles.len() / self.n_rows;
         let idx = loc.row * n_cols + loc.col;
         self.tiles.get(idx).cloned()
+    }
+
+    fn reset(&mut self, start_tile: &SharedTile) {
+        for tile in self.tiles.iter() {
+            let tile = tile.clone();
+            let kind = tile.borrow().kind;
+            match kind {
+                TileType::End => (),
+                _ if tile == *start_tile => tile.borrow_mut().distance = 0,
+                _ => tile.borrow_mut().distance = usize::MAX,
+            }
+        }
     }
 }
 
@@ -147,7 +185,7 @@ fn parse(contents: &str) -> (Grid, SharedTile) {
     panic!("No start tile found");
 }
 
-fn dijkstra(grid: Grid, start_tile: SharedTile) -> usize {
+fn dijkstra(grid: &Grid, start_tile: SharedTile) -> Option<usize> {
     let mut unvisited_list = Vec::<SharedTile>::new();
     unvisited_list.push(start_tile);
     let mut end: Option<SharedTile> = None;
@@ -168,11 +206,7 @@ fn dijkstra(grid: Grid, start_tile: SharedTile) -> usize {
             }
         }
     }
-    if let Some(end) = end {
-        end.borrow().distance
-    } else {
-        panic!("No path to end tile found");
-    }
+    end.map(|end_tile| end_tile.borrow().distance)
 }
 
 #[cfg(test)]
@@ -190,5 +224,9 @@ abdefghi"#;
     #[test]
     fn GIVEN_aoc_example_WHEN_running_part_1_THEN_expected_answers_returned() {
         assert_eq!(31, part1(EXAMPE));
+    }
+    #[test]
+    fn GIVEN_aoc_example_WHEN_running_part_2_THEN_expected_answers_returned() {
+        assert_eq!(29, part2(EXAMPE));
     }
 }
