@@ -106,9 +106,7 @@ impl Grid {
         }
         result
             .into_iter()
-            .filter(|neighbor| {
-                (neighbor.borrow().height as i16 - tile.borrow().height as i16).abs() <= 1
-            })
+            .filter(|neighbor| (neighbor.borrow().height as i16 - tile.borrow().height as i16) <= 1)
             .collect()
     }
     fn at(&self, loc: &Coord) -> Option<SharedTile> {
@@ -150,15 +148,14 @@ fn parse(contents: &str) -> (Grid, SharedTile) {
 }
 
 fn dijkstra(grid: Grid, start_tile: SharedTile) -> usize {
-    let mut candidates = Vec::<SharedTile>::new();
-    candidates.push(start_tile);
+    let mut unvisited_list = Vec::<SharedTile>::new();
+    unvisited_list.push(start_tile);
     let mut end: Option<SharedTile> = None;
-    while !candidates.is_empty() {
+    while !unvisited_list.is_empty() {
         // sort in reverse order:
-        candidates.sort_by(|lhs, rhs| rhs.borrow().distance.cmp(&lhs.borrow().distance));
-        let current = candidates.pop();
+        unvisited_list.sort_by(|lhs, rhs| rhs.borrow().distance.cmp(&lhs.borrow().distance));
+        let current = unvisited_list.pop();
         if let Some(current) = current {
-            println!("current: {:?}", current.borrow().location);
             let new_distance = current.borrow().distance + 1;
             for neighbor in grid.neighbors(current) {
                 let old_distance = neighbor.borrow().distance;
@@ -166,7 +163,7 @@ fn dijkstra(grid: Grid, start_tile: SharedTile) -> usize {
                 if let TileType::End = neighbor.borrow().kind {
                     end = Some(neighbor.clone());
                 } else if old_distance == usize::MAX {
-                    candidates.push(neighbor.clone());
+                    unvisited_list.push(neighbor.clone());
                 }
             }
         }
