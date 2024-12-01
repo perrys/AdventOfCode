@@ -41,9 +41,9 @@ auto getLines(const std::vector<std::string>& args) -> std::optional<std::vector
     return result;
 }
 
-template <typename T> auto toInt(const T& str) -> std::optional<int> {
+template <typename I> auto toInt(const I& subrange) -> std::optional<int> {
     int result{};
-    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+    auto [ptr, ec] = std::from_chars(&*subrange.begin(), &*subrange.end(), result);
 
     if (ec == std::errc()) {
         return result;
@@ -76,8 +76,6 @@ int main(int argc, char* argv[]) {
         auto tokens = line                                                            //
                       | std::ranges::views::split(std::string(" "))                   //
                       | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
-                      | std::ranges::views::transform(
-                            [](auto s) { return std::string_view(s.begin(), s.end()); }) //
                       | std::ranges::views::transform([](auto s) { return scp::toInt(s).value(); });
 
         auto vec = std::vector(tokens.begin(), tokens.end());
