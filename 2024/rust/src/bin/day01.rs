@@ -28,12 +28,7 @@ fn main() {
         (v[0], v[1])
     };
 
-    let (mut first, mut second): (Vec<i32>, Vec<i32>) = contents
-        .lines()
-        .map(lineprocessor)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .unzip();
+    let (mut first, mut second): (Vec<i32>, Vec<i32>) = contents.lines().map(lineprocessor).unzip();
 
     first.sort();
     second.sort();

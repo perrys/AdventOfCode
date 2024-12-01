@@ -1,5 +1,3 @@
-#include <stdlib.h>
-#include <string.h>
 
 #include <algorithm>
 #include <charconv>
@@ -8,7 +6,7 @@
 #include <iostream>
 #include <optional>
 #include <ranges>
-#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -22,12 +20,8 @@
  */
 
 namespace scp {
+
 auto getLines(const std::vector<std::string>& args) -> std::optional<std::vector<std::string>> {
-    if (args.size() != 2) {
-        std::filesystem::path progname(args[0]);
-        std::cerr << "USAGE: " << progname.filename() << " <filename.dat>" << std::endl;
-        return {};
-    }
     std::filesystem::path datafile(args[1]);
     if (!(std::filesystem::exists(datafile) && std::filesystem::is_regular_file(datafile))) {
         std::cerr << "ERROR: " << datafile << " is not readable." << std::endl;
@@ -59,26 +53,16 @@ template <typename T> auto toInt(const T& str) -> std::optional<int> {
     return {};
 }
 
-template <typename S> auto tokenize(const S& str) -> std::vector<std::string> {
-    std::string copy(str.begin(), str.end());
-    std::vector<std::string> result;
-    char* ptr = copy.data();
-    char* saveptr = nullptr;
-    while (ptr <= copy.data() + copy.size()) {
-        char* token = ::strtok_r(ptr, " \t", &saveptr);
-        if (nullptr == token) {
-            break;
-        }
-        result.push_back(token);
-        ptr = nullptr;
-    }
-    return result;
-}
-
 } // namespace scp
 
 int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv, argv + argc);
+    if (arguments.size() != 2) {
+        std::filesystem::path progname(arguments[0]);
+        std::cerr << "USAGE: " << progname.filename() << " <filename.dat>" << std::endl;
+        return {};
+    }
+
     const auto optlines = scp::getLines(arguments);
     if (!optlines) {
         return -1;
@@ -87,15 +71,23 @@ int main(int argc, char* argv[]) {
     std::vector<int> first;
     std::vector<int> second;
     size_t count = 0;
-    for (auto line :
-         optlines.value() | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
-        auto tokens = scp::tokenize(line);
-        if (tokens.size() != 2) {
-            std::cerr << "ERROR: invalid input at line " << count << std::endl;
-            ::exit(1);
+    for (auto line : optlines.value() //
+                         | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
+        auto tokens = line                                                            //
+                      | std::ranges::views::split(std::string(" "))                   //
+                      | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
+                      | std::ranges::views::transform(
+                            [](auto s) { return std::string_view(s.begin(), s.end()); }) //
+                      | std::ranges::views::transform([](auto s) { return scp::toInt(s).value(); });
+
+        auto vec = std::vector(tokens.begin(), tokens.end());
+        if (vec.size() != 2) {
+            std::cerr << "ERROR: invalid input at line " << count << ", read " << vec.size()
+                      << " tokens" << std::endl;
+            return -1;
         }
-        first.push_back(scp::toInt(tokens[0]).value());
-        second.push_back(scp::toInt(tokens[1]).value());
+        first.push_back(vec[0]);
+        second.push_back(vec[1]);
         ++count;
     }
 
@@ -109,7 +101,7 @@ int main(int argc, char* argv[]) {
     std::cout << "part1 result: " << total << std::endl;
 
     std::unordered_map<int, size_t> occurences;
-    std::ranges::for_each(first, [&occurences](auto val) {
+    std::ranges::for_each(second, [&occurences](auto val) {
         auto n = occurences[val];
         occurences[val] = n + 1;
     });
@@ -117,5 +109,5 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < first.size(); ++i) {
         total += first[i] * occurences[first[i]];
     }
-    std::cout << "part1 result: " << total << std::endl;
+    std::cout << "part2 result: " << total << std::endl;
 }
