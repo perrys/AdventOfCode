@@ -73,19 +73,20 @@ int main(int argc, char* argv[]) {
     size_t count = 0;
     for (auto line : optlines.value() //
                          | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
-        auto tokens = line                                                            //
-                      | std::ranges::views::split(std::string(" "))                   //
-                      | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
-                      | std::ranges::views::transform([](auto s) { return scp::toInt(s).value(); });
+        auto numbers =                                                      //
+            line                                                            //
+            | std::ranges::views::split(std::string(" "))                   //
+            | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
+            | std::ranges::views::transform([](auto s) { return scp::toInt(s).value(); });
 
-        auto vec = std::vector(tokens.begin(), tokens.end());
-        if (vec.size() != 2) {
-            std::cerr << "ERROR: invalid input at line " << count << ", read " << vec.size()
-                      << " tokens" << std::endl;
+        auto numvec = std::vector(numbers.begin(), numbers.end());
+        if (numvec.size() != 2) {
+            std::cerr << "ERROR: invalid input at line " << count << ", read " << numvec.size()
+                      << " numbers" << std::endl;
             return -1;
         }
-        first.push_back(vec[0]);
-        second.push_back(vec[1]);
+        first.push_back(numvec[0]);
+        second.push_back(numvec[1]);
         ++count;
     }
 
