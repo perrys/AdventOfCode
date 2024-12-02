@@ -3,6 +3,11 @@
 //!
 //! See <https://adventofcode.com/2023/day/6>
 //!
+/* start with line:
+
+~/dev/advent_of_code/2023/rust/target/debug/day06 /home/stu/dev/advent_of_code/2023/input/day06.dat
+
+*/
 use std::fs;
 
 fn main() {

@@ -1,5 +1,11 @@
 use std::fs;
 
+/* start with line:
+
+~/dev/advent_of_code/2022/rust/target/debug/day10 /home/stu/dev/advent_of_code/2022/input/day10.dat
+
+*/
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
