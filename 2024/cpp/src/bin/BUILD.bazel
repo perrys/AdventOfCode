@@ -1,4 +1,5 @@
-cc_binary(
-    name = "day01",
-    srcs = ["day01.cpp"],
-)
+
+
+load (":bld.bzl", "all_binaries")
+all_binaries(glob(["day*.cpp"]))
+

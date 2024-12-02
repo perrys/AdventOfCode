@@ -1,12 +1,10 @@
 
+#include "lib/file_utils.hpp"
+#include "lib/transform.hpp"
+
 #include <algorithm>
-#include <charconv>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <optional>
 #include <ranges>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -19,42 +17,6 @@
  * See <https://adventofcode.com/2024/day/1>
  */
 
-namespace scp {
-
-auto getLines(const std::vector<std::string>& args) -> std::optional<std::vector<std::string>> {
-    std::filesystem::path datafile(args[1]);
-    if (!(std::filesystem::exists(datafile) && std::filesystem::is_regular_file(datafile))) {
-        std::cerr << "ERROR: " << datafile << " is not readable." << std::endl;
-        return {};
-    }
-    std::ifstream input(datafile.c_str());
-    if (!input.is_open()) {
-        std::cerr << "ERROR: " << datafile << " could not be opened." << std::endl;
-        return {};
-    }
-    std::vector<std::string> result;
-    std::string line;
-    while (std::getline(input, line)) {
-        result.push_back(line);
-    }
-    std::cout << "read " << result.size() << " lines from " << datafile << std::endl;
-    return result;
-}
-
-template <typename I> auto toInt(const I& subrange) -> std::optional<int> {
-    int result{};
-    auto [ptr, ec] = std::from_chars(&*subrange.begin(), &*subrange.end(), result);
-
-    if (ec == std::errc()) {
-        return result;
-    }
-    std::cerr << "ERROR: invalid integer \"" << ptr << "\", "
-              << std::make_error_condition(ec).message() << std::endl;
-    return {};
-}
-
-} // namespace scp
-
 int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv, argv + argc);
     if (arguments.size() != 2) {
@@ -63,21 +25,16 @@ int main(int argc, char* argv[]) {
         return {};
     }
 
-    const auto optlines = scp::getLines(arguments);
-    if (!optlines) {
-        return -1;
-    }
-
+    const auto lines = scp::getLines(arguments[1]);
     std::vector<int> first;
     std::vector<int> second;
     size_t count = 0;
-    for (auto line : optlines.value() //
-                         | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
+    for (auto line : lines | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
         auto numbers =                                                      //
             line                                                            //
             | std::ranges::views::split(std::string(" "))                   //
             | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
-            | std::ranges::views::transform([](auto s) { return scp::toInt(s).value(); });
+            | std::ranges::views::transform(scp::parseInt());
 
         auto numvec = std::vector(numbers.begin(), numbers.end());
         if (numvec.size() != 2) {
