@@ -74,21 +74,23 @@ part1:
         xor %r15, %r15          # score
         mov $in_buffer, %r14    # buffer ptr 
         xor %r13, %r13          # line counter
-p1_newline:
+        ## newline:
+1:
         cmp %r13, num_lines
-        je p1_done
+        je 3f                           # processing complete
         mov line_endings(,%r13,8), %r12  # end-of-line ptr
         sub %r14, %r12                   # num characters on this line
         shr $1, %r12                     # half num chars 
         mov %r14, %rdi
         mov %r12, %rsi
-        call get_mask_for_slice
+        call get_mask_for_slice # process first half of line
         mov %rax, %rbx
         add %r12, %r14          # move buffer to second half of line
         xor %rdi, %rdi          # reset line index
-p1_second_half_loop:
+        ## loop over second half of line:
+2:
         cmp %rdi, %r12
-        je p1_notfound
+        je .L_p1_notfound
         movb (%r14, %rdi), %cl  # read byte 
         inc %rdi
         xor %r9, %r9
@@ -98,22 +100,23 @@ p1_second_half_loop:
         mov $1, %rax
         shl %cl, %rax           # shift to place in bit vector
         and %rbx, %rax          # test if this item is already present in the mask
-        jz p1_second_half_loop  # if not, loop again
+        jz 2b                   # if not, loop again
         add %r12, %r14          # found it! Now move buffer to next line
         inc %r14                # skip newline
         mov %r9, %rdi
         call get_priority
         add %rax, %r15           # add to score
         inc %r13
-        jmp p1_newline
-p1_notfound:
+        jmp 1b                  # newline
+.L_p1_notfound:
         mov $notfound_errmsg, %rdi
         mov %r13, %rsi
         mov $0, %rax
         call printf
         mov $1, %rdi
         call exit
-p1_done:
+        ## processing complete:
+3:
         mov %r15, %rax
         pop %rbx
         pop %r12
@@ -137,17 +140,18 @@ part2:
         xor %sil, %sil          # initialize the lookup table
         xor %ecx, %ecx
         mov $in_buffer, %r14    # buffer ptr 
-p2_ltbl_loop:
-        cmp $64, %sil
-        je p2_init_done
-        mov $'A', %cl            # loop over letters covering A-z
+        ## loop to populate lookup table:
+9:
+        cmp $64, %sil           # process 64 ascii codes
+        je 8f
+        mov $'A', %cl           # letters covering A-z
         add %sil, %cl
         inc %sil
-        mov %cl, %al                 # remember the character
-        andb $63, %cl                # cl %= 64
-        movb %al, lookup_table(,%ecx,) # save character to that offset in the lookup table
-        jmp p2_ltbl_loop
-p2_init_done:   
+        mov %cl, %al            # remember the character
+        andb $63, %cl           # cl %= 64, %cl is lower byte of %ecx
+        movb %al, lookup_table(,%ecx,) # save character to offset in the lookup table
+        jmp 9b
+8:   
         xor %r15, %r15          # score
         mov $in_buffer, %r14    # buffer ptr 
         xor %r13, %r13          # line counter
