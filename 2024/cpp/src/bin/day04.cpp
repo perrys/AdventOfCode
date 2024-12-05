@@ -13,7 +13,7 @@
  * /file
  *
  * Advent of code challenge 2024.
- * Day 4
+ * Day 4: Ceres Search
  *
  * See <https://adventofcode.com/2024>
  */
@@ -21,6 +21,7 @@
 namespace {
 
 struct Grid {
+
     std::vector<std::string> rows;
     size_t rowWidth;
 
@@ -40,28 +41,49 @@ struct Grid {
         }
         return {};
     }
+
+    std::optional<char> getWithOffsets(size_t ix, size_t iy, int dx, int dy) const {
+        if (ix == 0 && dx < 0) {
+            return {};
+        }
+        if (iy == 0 && dy < 0) {
+            return {};
+        }
+        return this->get(ix + dx, iy + dy);
+    }
+
+    static Grid create(std::filesystem::path input) {
+        auto lines = scp::getLines(input);
+        size_t width = 0;
+        for (size_t i = 0; i < lines.size(); ++i) {
+            const auto& line = lines[i];
+            if (i > 1) {
+                if (width != line.length()) {
+                    std::cerr << "ERROR: inconsistent line length at " << i << std::endl;
+                    return Grid({});
+                }
+            } else {
+                width = line.length();
+            }
+        }
+        return Grid(std::move(lines));
+    }
 };
 
 size_t subsearch(const Grid& grid, size_t ix, size_t iy, int dx, int dy) {
     std::array<char, 3> letters = {'M', 'A', 'S'};
     for (auto letter : letters) {
-        if (ix == 0 && dx < 0) {
-            return false;
-        }
-        if (iy == 0 && dy < 0) {
-            return false;
+        auto opt = grid.getWithOffsets(ix, iy, dx, dy);
+        if (!opt || opt.value() != letter) {
+            return 0;
         }
         ix += dx;
         iy += dy;
-        auto opt = grid.get(ix, iy);
-        if (!opt || opt.value() != letter) {
-            return false;
-        }
     }
-    return true;
+    return 1;
 }
 
-size_t search(const Grid& grid, size_t ix, size_t iy) {
+size_t part1Search(const Grid& grid, size_t ix, size_t iy) {
     size_t total = 0;
     total += subsearch(grid, ix, iy, 0, 1);
     total += subsearch(grid, ix, iy, 0, -1);
@@ -74,21 +96,23 @@ size_t search(const Grid& grid, size_t ix, size_t iy) {
     return total;
 }
 
-Grid parseGrid(std::filesystem::path input) {
-    auto lines = scp::getLines(input);
-    size_t width = 0;
-    for (size_t i = 0; i < lines.size(); ++i) {
-        const auto& line = lines[i];
-        if (i > 1) {
-            if (width != line.length()) {
-                std::cerr << "inconsistent line length at " << i << std::endl;
-                return Grid({});
-            }
-        } else {
-            width = line.length();
-        }
+size_t part2Search(const Grid& grid, size_t ix, size_t iy) {
+    auto topLeft = grid.getWithOffsets(ix, iy, -1, -1);
+    auto topRight = grid.getWithOffsets(ix, iy, 1, -1);
+    auto bottomLeft = grid.getWithOffsets(ix, iy, -1, 1);
+    auto bottomRight = grid.getWithOffsets(ix, iy, 1, 1);
+    if (!topLeft || !topRight || !bottomLeft || !bottomRight) {
+        return 0;
     }
-    return Grid(std::move(lines));
+    auto line1 = std::vector{topLeft.value(), bottomRight.value()};
+    auto line2 = std::vector{topRight.value(), bottomLeft.value()};
+    std::ranges::sort(line1);
+    std::ranges::sort(line2);
+    const auto expected = std::vector{'M', 'S'};
+    if (line1 != expected || line2 != expected) {
+        return 0;
+    }
+    return 1;
 }
 
 } // namespace
@@ -101,16 +125,21 @@ int main(int argc, char* argv[]) {
         return {};
     }
 
-    const auto grid = parseGrid(arguments[1]);
-    int total = 0;
+    const auto grid = Grid::create(arguments[1]);
+    int part1Total = 0;
+    int part2Total = 0;
+
     for (size_t iy = 0; iy < grid.height(); ++iy) {
         for (size_t ix = 0; ix < grid.width(); ++ix) {
             auto letter = grid.get(ix, iy).value();
             if ('X' == letter) {
-                total += search(grid, ix, iy);
+                part1Total += part1Search(grid, ix, iy);
+            }
+            if ('A' == letter) {
+                part2Total += part2Search(grid, ix, iy);
             }
         }
     }
-    std::cout << "part1 answer: " << total << std::endl;
-    return 0;
+    std::cout << "part1 answer: " << part1Total << std::endl;
+    std::cout << "part2 answer: " << part2Total << std::endl;
 }
