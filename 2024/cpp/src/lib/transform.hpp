@@ -15,7 +15,7 @@ class parseInt {
         }
         return {};
     }
-    template <typename I> auto operator()(const I& subrange) -> int {
+    template <typename I> auto operator()(const I& subrange) const -> int {
         int result{};
         auto [ptr, ec] = std::from_chars(&*subrange.begin(), &*subrange.end(), result);
         if (ec == std::errc()) {
