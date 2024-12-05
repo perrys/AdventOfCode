@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs, rc::Rc};
+use std::{cell::RefCell, cmp, fs, rc::Rc};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -26,25 +26,17 @@ fn make_shared<T>(item: T) -> Rc<RefCell<T>> {
 
 type SharedItem = Rc<RefCell<Item>>;
 
-enum ItemKind {
+enum Item {
     Branch(Vec<SharedItem>),
     Leaf(u8),
 }
 
-struct Item {
-    kind: ItemKind,
-}
-
 impl Item {
     fn new_branch() -> Self {
-        Self {
-            kind: ItemKind::Branch(vec![]),
-        }
+        Self::Branch(vec![])
     }
     fn new_leaf(num: u8) -> Self {
-        Self {
-            kind: ItemKind::Leaf(num),
-        }
+        Self::Leaf(num)
     }
 }
 
@@ -53,10 +45,10 @@ impl Item {
         let add_child = |stack: &mut Vec<SharedItem>, item: SharedItem| {
             if !stack.is_empty() {
                 let parent = stack.last().unwrap().clone();
-                let kind = &mut parent.borrow_mut().kind;
-                match kind {
-                    ItemKind::Leaf(_) => panic!("logic error - non-branch parent"),
-                    ItemKind::Branch(ref mut children) => {
+                let mut kind = parent.borrow_mut();
+                match *kind {
+                    Item::Leaf(_) => panic!("logic error - non-branch parent"),
+                    Item::Branch(ref mut children) => {
                         children.push(item);
                     }
                 }
@@ -107,8 +99,8 @@ impl Item {
     fn to_str(&self) -> String {
         let mut buffer = Vec::<char>::new();
         fn walk(item: &Item, buffer: &mut Vec<char>) {
-            match &item.kind {
-                ItemKind::Branch(children) => {
+            match item {
+                Item::Branch(children) => {
                     buffer.push('[');
                     for (idx, child) in children.iter().enumerate() {
                         if idx > 0 {
@@ -118,7 +110,7 @@ impl Item {
                     }
                     buffer.push(']');
                 }
-                ItemKind::Leaf(val) => {
+                Item::Leaf(val) => {
                     let outstr = format!("{val}");
                     buffer.extend(outstr.chars());
                 }
@@ -126,6 +118,25 @@ impl Item {
         }
         walk(self, &mut buffer);
         String::from_iter(buffer.into_iter())
+    }
+}
+
+fn compare(lhs: &SharedItem, rhs: &SharedItem) -> cmp::Ordering {
+    match *lhs.borrow() {
+        Item::Branch(ref lhs_children) => match *rhs.borrow() {
+            Item::Branch(ref rhs_children) => {
+                for i in 0..lhs_children.len().min(rhs_children.len()) {
+                    let cmp_result = compare(&lhs_children[i], &rhs_children[i]);
+                    match cmp_result {
+                        cmp::Ordering::Equal => (),
+                        _ => return cmp_result,
+                    };
+                }
+                return lhs_children.len().cmp(&rhs_children.len());
+            }
+            Item::Leaf(_) => todo!(),
+        },
+        Item::Leaf(_) => todo!(),
     }
 }
 
