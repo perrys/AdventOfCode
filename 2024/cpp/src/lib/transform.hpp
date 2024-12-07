@@ -5,18 +5,18 @@
 
 namespace scp {
 
-class parseInt {
+template <typename T> class Parser {
   public:
-    static auto parse(const char* begin, const char* end) -> std::optional<int> {
-        int result{};
+    static auto parse(const char* begin, const char* end) -> std::optional<T> {
+        T result{};
         auto [ptr, ec] = std::from_chars(begin, end, result);
         if (ec == std::errc() && ptr == end) {
             return result;
         }
         return {};
     }
-    template <typename I> auto operator()(const I& subrange) const -> int {
-        int result{};
+    template <typename I> auto operator()(const I& subrange) const -> T {
+        T result{};
         auto [ptr, ec] = std::from_chars(&*subrange.begin(), &*subrange.end(), result);
         if (ec == std::errc()) {
             return result;
@@ -27,5 +27,7 @@ class parseInt {
         throw std::runtime_error(msg.str());
     }
 };
+
+using parseInt = Parser<int>;
 
 } // namespace scp
