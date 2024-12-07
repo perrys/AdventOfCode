@@ -1,5 +1,6 @@
 
 #include "lib/file_utils.hpp"
+#include "lib/grid.hpp"
 #include "lib/transform.hpp"
 
 #include <assert.h>
@@ -21,98 +22,32 @@
  * See <https://adventofcode.com/2024>
  */
 
-namespace std {
-template <> struct hash<std::pair<size_t, size_t>> {
-    size_t operator()(const std::pair<size_t, size_t>& p) const {
-        std::hash<size_t> hasher;
-        return hasher(p.first) ^ hasher(p.second);
-    }
-};
-} // namespace std
-
 namespace {
 
-struct Grid {
+using namespace scp;
 
-    std::vector<std::string> rows;
-    size_t rowWidth;
-
-    Grid(std::vector<std::string>&& g) : rows(g), rowWidth(g[0].size()) {
-    }
-
-    size_t width() const {
-        return this->rowWidth;
-    }
-    size_t height() const {
-        return this->rows.size();
-    }
-
-    std::optional<char> get(size_t ix, size_t iy) const {
-        if (ix < this->rowWidth && iy < this->rows.size()) {
-            return this->rows.at(iy).at(ix);
-        }
-        return {};
-    }
-
-    std::optional<char> getWithOffsets(size_t ix, size_t iy, int dx, int dy) const {
-        if (ix == 0 && dx < 0) {
-            return {};
-        }
-        if (iy == 0 && dy < 0) {
-            return {};
-        }
-        return this->get(ix + dx, iy + dy);
-    }
-
-    static Grid create(std::vector<std::string>&& lines) {
-        size_t width = 0;
-        for (size_t i = 0; i < lines.size(); ++i) {
-            const auto& line = lines[i];
-            if (i > 1) {
-                if (width != line.length()) {
-                    std::cerr << "ERROR: inconsistent line length at " << i << std::endl;
-                    return Grid({});
-                }
-            } else {
-                width = line.length();
-            }
-        }
-        return Grid(std::move(lines));
-    }
-};
-
-using CoOrdinate = std::pair<size_t, size_t>;
-
-enum dydir { NORTH = -1, SOUTH = 1 };
-enum dxdir { EAST = 1, WEST = -1 };
-
-size_t walk(Grid grid, size_t ix, size_t iy) {
-    int dx = 0;
-    int dy = -1;
+size_t walk(Grid grid, CoOrdinate loc) {
+    Direction dir = NORTH;
     std::optional<char> next;
-    std::unordered_set<CoOrdinate> visited{{ix, iy}};
-    while ((next = grid.getWithOffsets(ix, iy, dx, dy))) {
+    std::unordered_set<CoOrdinate> visited;
+    visited.insert(loc);
+    while ((next = grid.getWithOffsets(loc, dir))) {
         switch (next.value()) {
         case '.':
         case '^':
-            ix += dx;
-            iy += dy;
-            visited.insert({ix, iy});
-            std::cout << ix << "," << iy << std::endl;
+            loc = loc.move(dir);
+            visited.insert(loc);
+            //            std::cout << loc.ix << "," << loc.iy << std::endl;
             break;
         case '#':
-            if (dxdir::EAST == dx) {
-                dx = 0;
-                dy = dydir::SOUTH;
-            } else if (dxdir::WEST == dx) {
-                dx = 0;
-                dy = dydir::NORTH;
-            } else if (dydir::NORTH == dy) {
-                dx = dxdir::EAST;
-                dy = 0;
-            } else if (dydir::SOUTH == dy) {
-                dx = dxdir::WEST;
-                dy = 0;
+            if (EAST == dir) {
+                dir = SOUTH;
+            } else if (WEST == dir) {
+                dir = NORTH;
+            } else if (NORTH == dir) {
+                dir = EAST;
+            } else if (SOUTH == dir) {
+                dir = WEST;
             }
         }
     }
@@ -142,5 +77,5 @@ int main(int argc, char* argv[]) {
 done:
     const auto grid = Grid::create(std::move(lines));
 
-    std::cout << "part1 answer: " << walk(grid, ix, iy) << std::endl;
+    std::cout << "part1 answer: " << walk(grid, {ix, iy}) << std::endl;
 }
