@@ -25,14 +25,18 @@ Grid Grid::create(std::vector<std::string>&& lines) {
     }
     return Grid(std::move(lines));
 }
-std::optional<char> Grid::get(CoOrdinate c) const {
+std::optional<char> Grid::get(Coordinate c) const {
     if (c.ix < this->rowWidth && c.iy < this->rows.size()) {
         return this->rows.at(c.iy).at(c.ix);
     }
     return {};
 }
 
-std::optional<char> Grid::getWithOffsets(CoOrdinate c, Direction d) const {
+void Grid::set(Coordinate c, char p) {
+    this->rows.at(c.iy).at(c.ix) = p;
+}
+
+std::optional<char> Grid::getWithOffsets(Coordinate c, Direction d) const {
     if (c.ix == 0 && d.dx < 0) {
         return {};
     }
@@ -42,3 +46,8 @@ std::optional<char> Grid::getWithOffsets(CoOrdinate c, Direction d) const {
     return this->get({c.ix + d.dx, c.iy + d.dy});
 }
 } // namespace scp
+
+std::ostream& operator<<(std::ostream& out, const scp::Coordinate& c) {
+    out << "(" << c.ix << "," << c.iy << ")";
+    return out;
+}

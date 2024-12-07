@@ -23,7 +23,7 @@ namespace {
 
 using namespace scp;
 
-size_t subsearch(const Grid& grid, CoOrdinate c, Direction d) {
+size_t subsearch(const Grid& grid, Coordinate c, Direction d) {
     std::array<char, 3> letters = {'M', 'A', 'S'};
     for (auto letter : letters) {
         auto opt = grid.getWithOffsets(c, d);
@@ -35,7 +35,7 @@ size_t subsearch(const Grid& grid, CoOrdinate c, Direction d) {
     return 1;
 }
 
-size_t part1Search(const Grid& grid, CoOrdinate c) {
+size_t part1Search(const Grid& grid, Coordinate c) {
     size_t total = 0;
     total += subsearch(grid, c, NORTH);
     total += subsearch(grid, c, SOUTH);
@@ -48,7 +48,7 @@ size_t part1Search(const Grid& grid, CoOrdinate c) {
     return total;
 }
 
-size_t part2Search(const Grid& grid, CoOrdinate c) {
+size_t part2Search(const Grid& grid, Coordinate c) {
     auto nw = grid.getWithOffsets(c, NORTH + WEST);
     auto ne = grid.getWithOffsets(c, NORTH + EAST);
     auto sw = grid.getWithOffsets(c, SOUTH + WEST);
@@ -78,8 +78,8 @@ int main(int argc, char* argv[]) {
     }
 
     const auto grid = Grid::create(scp::getLines(arguments[1]));
-    int part1Total = 0;
-    int part2Total = 0;
+    size_t part1Total = 0;
+    size_t part2Total = 0;
 
     for (size_t iy = 0; iy < grid.height(); ++iy) {
         for (size_t ix = 0; ix < grid.width(); ++ix) {

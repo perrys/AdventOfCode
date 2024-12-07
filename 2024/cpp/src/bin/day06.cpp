@@ -26,17 +26,30 @@ namespace {
 
 using namespace scp;
 
-size_t walk(Grid grid, CoOrdinate loc) {
+std::optional<size_t> walk(Grid grid, Coordinate loc,
+                           std::vector<std::pair<Coordinate, Direction>>* recorder = nullptr) {
     Direction dir = NORTH;
     std::optional<char> next;
-    std::unordered_set<CoOrdinate> visited;
+    std::unordered_set<Coordinate> visited;
+    std::unordered_set<std::pair<Coordinate, Direction>> rays;
     visited.insert(loc);
+    if (recorder) {
+        recorder->emplace_back(loc, dir);
+    }
     while ((next = grid.getWithOffsets(loc, dir))) {
+        auto ray = std::make_pair(loc, dir);
         switch (next.value()) {
         case '.':
         case '^':
             loc = loc.move(dir);
             visited.insert(loc);
+            if (rays.contains(ray)) {
+                return {}; // circular path
+            }
+            rays.insert(ray);
+            if (recorder) {
+                recorder->push_back(ray);
+            }
             //            std::cout << loc.ix << "," << loc.iy << std::endl;
             break;
         case '#':
@@ -74,8 +87,27 @@ int main(int argc, char* argv[]) {
         }
     }
     std::cerr << "ERROR: can't find start point" << std::endl;
-done:
-    const auto grid = Grid::create(std::move(lines));
+    return -1;
 
-    std::cout << "part1 answer: " << walk(grid, {ix, iy}) << std::endl;
+done:
+    const scp::Coordinate startPoint{ix, iy};
+    auto grid = Grid::create(std::move(lines));
+    std::vector<std::pair<scp::Coordinate, scp::Direction>> originalPath;
+    std::cout << "part1 answer: " << walk(grid, startPoint, &originalPath).value() << std::endl;
+
+    std::unordered_set<Coordinate> blocks;
+    for (const auto& point : originalPath) {
+        auto [loc, dir] = point;
+        Coordinate block = loc.move(dir);
+        auto opt = grid.get(block);
+        if (opt && opt.value() != '#') {
+            grid.set(block, '#');
+            if (!walk(grid, startPoint)) {
+                //std::cout << "circular path at " << block << std::endl;
+                blocks.insert(block);
+            }
+            grid.set(block, opt.value());
+        }
+    }
+    std::cout << "part2 answer: " << blocks.size() << std::endl;
 }

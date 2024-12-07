@@ -1,4 +1,5 @@
 
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -20,13 +21,13 @@ extern const Direction SOUTH;
 extern const Direction EAST;
 extern const Direction WEST;
 
-struct CoOrdinate {
+struct Coordinate {
     size_t ix;
     size_t iy;
-    bool operator==(const CoOrdinate& other) const {
+    bool operator==(const Coordinate& other) const {
         return this->ix == other.ix && this->iy == other.iy;
     }
-    CoOrdinate move(const Direction& dir, const size_t nsteps = 1) const {
+    Coordinate move(const Direction& dir, const size_t nsteps = 1) const {
         return {this->ix + dir.dx * nsteps, this->iy + dir.dy * nsteps};
     }
 };
@@ -47,9 +48,10 @@ class Grid {
         return this->rows.size();
     }
 
-    std::optional<char> get(CoOrdinate xy) const;
+    std::optional<char> get(Coordinate xy) const;
 
-    std::optional<char> getWithOffsets(CoOrdinate xy, Direction dxy) const;
+    void set(Coordinate xy, char c);
+    std::optional<char> getWithOffsets(Coordinate xy, Direction dxy) const;
 
     static Grid create(std::vector<std::string>&& lines);
 };
@@ -57,11 +59,30 @@ class Grid {
 } // namespace scp
 
 namespace std {
-template <> struct hash<scp::CoOrdinate> {
-    size_t operator()(const scp::CoOrdinate& p) const {
+template <> struct hash<scp::Coordinate> {
+    size_t operator()(const scp::Coordinate& p) const {
         std::hash<size_t> hasher;
-        size_t ix = p.ix >> 1 | p.ix << (sizeof(scp::CoOrdinate::ix) * 8 - 1);
+        size_t ix = p.ix >> 1 | p.ix << (sizeof(scp::Coordinate::ix) * 8 - 1);
         return hasher(ix) ^ hasher(p.iy);
     }
 };
+
+template <> struct hash<scp::Direction> {
+    size_t operator()(const scp::Direction& p) const {
+        std::hash<size_t> hasher;
+        size_t dx = p.dx >> 1 | p.dx << (sizeof(scp::Direction::dx) * 8 - 1);
+        return hasher(dx) ^ hasher(p.dy);
+    }
+};
+
+template <typename P1, typename P2> struct hash<std::pair<P1, P2>> {
+    size_t operator()(const std::pair<P1, P2>& p) const {
+        std::hash<P1> hash1;
+        std::hash<P2> hash2;
+        return hash1(p.first) ^ hash2(p.second);
+    }
+};
+
 } // namespace std
+
+std::ostream& operator<<(std::ostream& out, const scp::Coordinate& c);
