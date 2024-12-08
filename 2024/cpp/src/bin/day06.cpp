@@ -1,6 +1,7 @@
 
 #include "lib/file_utils.hpp"
 #include "lib/grid.hpp"
+#include "lib/hash_utils.hpp"
 #include "lib/transform.hpp"
 
 #include <assert.h>

@@ -1,3 +1,6 @@
+#pragma once
+
+#include "lib/hash_utils.hpp"
 
 #include <iostream>
 #include <memory>
@@ -21,16 +24,21 @@ extern const Direction SOUTH;
 extern const Direction EAST;
 extern const Direction WEST;
 
-struct Coordinate {
-    size_t ix;
-    size_t iy;
-    bool operator==(const Coordinate& other) const {
+template <typename T> struct GenCoordinate {
+    T ix;
+    T iy;
+    bool operator==(const GenCoordinate& other) const {
         return this->ix == other.ix && this->iy == other.iy;
     }
-    Coordinate move(const Direction& dir, const size_t nsteps = 1) const {
+    GenCoordinate move(const Direction& dir, const size_t nsteps = 1) const {
         return {this->ix + dir.dx * nsteps, this->iy + dir.dy * nsteps};
     }
+    std::pair<int64_t, int64_t> displacement(const GenCoordinate& other) const {
+        return {(int64_t)other.ix - (int64_t)this->ix, (int64_t)other.iy - (int64_t)this->iy};
+    }
 };
+
+using Coordinate = GenCoordinate<size_t>;
 
 class Grid {
   private:
@@ -59,27 +67,17 @@ class Grid {
 } // namespace scp
 
 namespace std {
-template <> struct hash<scp::Coordinate> {
-    size_t operator()(const scp::Coordinate& p) const {
+template <typename T> struct hash<scp::GenCoordinate<T>> {
+    size_t operator()(const scp::GenCoordinate<T>& p) const {
         std::hash<size_t> hasher;
-        size_t ix = p.ix >> 1 | p.ix << (sizeof(scp::Coordinate::ix) * 8 - 1);
-        return hasher(ix) ^ hasher(p.iy);
+        return hasher(scp::rotateRight(p.ix, 1)) ^ hasher(p.iy);
     }
 };
 
 template <> struct hash<scp::Direction> {
     size_t operator()(const scp::Direction& p) const {
         std::hash<size_t> hasher;
-        size_t dx = p.dx >> 1 | p.dx << (sizeof(scp::Direction::dx) * 8 - 1);
-        return hasher(dx) ^ hasher(p.dy);
-    }
-};
-
-template <typename P1, typename P2> struct hash<std::pair<P1, P2>> {
-    size_t operator()(const std::pair<P1, P2>& p) const {
-        std::hash<P1> hash1;
-        std::hash<P2> hash2;
-        return hash1(p.first) ^ hash2(p.second);
+        return hasher(scp::rotateRight(p.dx, 1)) ^ hasher(p.dy);
     }
 };
 
