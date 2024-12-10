@@ -79,27 +79,26 @@ int main(int argc, char* argv[]) {
         if (0 == lastFile.length) {
             filelist.pop_back();
             if (nextFree.length > 0) { // split the free block
-                newFiles.emplace_back(nextFree.start_pos, nextFree.length, nextFree.id);
-                nextFree.start_pos += nextFree.length;
+                newFiles.emplace_back(nextFree.start_pos, nblocks, nextFree.id);
+                nextFree.start_pos += nblocks;
                 nextFree.id = {};
             }
         }
         if (0 == nextFree.length) {
-            newFiles.emplace_back(nextFree.start_pos, nextFree.length, nextFree.id);
+            newFiles.emplace_back(nextFree.start_pos, nblocks, nextFree.id);
             freelist.pop_back();
         }
     }
     size_t part1Total = 0;
     for (const auto& block : filelist) {
         for (size_t i = 0; i < block.length; ++i) {
-            part1Total += block.start_pos + i * block.id.value();
-            std::cout << "(" << block.id.value() << ", " << block.start_pos + i << ")" << std::endl;
+            part1Total += (block.start_pos + i) * block.id.value();
         }
     }
     for (const auto& block : newFiles) {
         for (size_t i = 0; i < block.length; ++i) {
-            part1Total += block.start_pos + i * block.id.value();
-            std::cout << "(" << block.id.value() << ", " << block.start_pos + i << ")" << std::endl;
+            part1Total += (block.start_pos + i) * block.id.value();
+            // std::cout << "(" << block.id.value() << ", " << block.start_pos + i << ")" << std::endl;
         }
     }
     std::cout << "part1 total = " << part1Total << std::endl;
