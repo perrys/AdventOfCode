@@ -23,6 +23,7 @@
  */
 
 namespace {
+
 void getValidNeighbours(const scp::Grid& grid, scp::Coordinate current,
                         std::vector<scp::Coordinate>& out) {
     std::array<scp::Direction, 4> dirs{scp::NORTH, scp::SOUTH, scp::EAST, scp::WEST};
@@ -60,6 +61,39 @@ size_t depthFirstSearch(const scp::Grid& grid, scp::Coordinate start) {
     return endPoints.size();
 }
 
+std::string toString(const std::vector<scp::Coordinate>& paths) {
+    std::stringstream buf;
+    for (auto path : paths) {
+        buf << path << ", ";
+    }
+    return buf.str();
+}
+
+void depthFirstSearchRecursive(const scp::Grid& grid, scp::Coordinate current,
+                               std::vector<scp::Coordinate>& callStack,
+                               std::unordered_set<std::string>& paths) {
+    if ('9' == grid.get(current).value()) {
+        paths.insert(toString(callStack));
+        return;
+    }
+    std::vector<scp::Coordinate> validNeighbours;
+    getValidNeighbours(grid, current, validNeighbours);
+    for (const auto n : validNeighbours) {
+        if (std::find(callStack.rbegin(), callStack.rend(), n) == callStack.rend()) {
+            callStack.push_back(n);
+            depthFirstSearchRecursive(grid, n, callStack, paths);
+            callStack.pop_back();
+        }
+    }
+}
+
+size_t depthFirstSearchUniquePaths(const scp::Grid& grid, scp::Coordinate start) {
+    std::vector<scp::Coordinate> stack;
+    std::unordered_set<std::string> paths;
+    depthFirstSearchRecursive(grid, start, stack, paths);
+    return paths.size();
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -72,14 +106,16 @@ int main(int argc, char* argv[]) {
 
     auto grid = scp::Grid::create(scp::getLines(arguments[1]));
 
-    size_t total = 0;
+    size_t part1Total = 0;
+    size_t part2Total = 0;
     for (size_t iy = 0; iy < grid.height(); ++iy) {
         for (size_t ix = 0; ix < grid.width(); ++ix) {
             if (grid.get({ix, iy}).value() == '0') {
-                const size_t score = depthFirstSearch(grid, {ix, iy});
-                total += score;
+                part1Total += depthFirstSearch(grid, {ix, iy});
+                part2Total += depthFirstSearchUniquePaths(grid, {ix, iy});
             }
         }
     }
-    std::cout << "part1 answer: " << total << std::endl;
+    std::cout << "part1 answer: " << part1Total << std::endl;
+    std::cout << "part2 answer: " << part2Total << std::endl;
 }
