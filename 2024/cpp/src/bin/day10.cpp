@@ -38,14 +38,14 @@ void getValidNeighbours(const scp::Grid& grid, scp::Coordinate current,
 }
 
 size_t depthFirstSearch(const scp::Grid& grid, scp::Coordinate start) {
-    std::vector<scp::Coordinate> queue{start};
+    std::vector<scp::Coordinate> stack{start};
     std::vector<scp::Coordinate> validNeighbours;
     std::unordered_set<scp::Coordinate> endPoints;
     std::unordered_set<scp::Coordinate> visited;
-    while (!queue.empty()) {
-        scp::Coordinate current = queue.back();
+    while (!stack.empty()) {
+        scp::Coordinate current = stack.back();
+        stack.pop_back();
         visited.insert(current);
-        queue.pop_back();
         if ('9' == grid.get(current).value()) {
             endPoints.insert(current);
             continue;
@@ -53,7 +53,7 @@ size_t depthFirstSearch(const scp::Grid& grid, scp::Coordinate start) {
         getValidNeighbours(grid, current, validNeighbours);
         for (const auto n : validNeighbours) {
             if (!visited.contains(n)) {
-                queue.push_back(n);
+                stack.push_back(n);
             }
         }
     }
