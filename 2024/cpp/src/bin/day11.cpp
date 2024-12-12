@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -36,7 +37,7 @@ bool evenDigits(size_t n) {
 
 std::pair<size_t, size_t> splitDigits(size_t n) {
     size_t ndigits = countDigits(n);
-    size_t factor = 10 ^ (ndigits - 1);
+    size_t factor = std::pow(10, (ndigits / 2));
     size_t top = n / factor;
     size_t bottom = n - (top * factor);
     return {top, bottom};
@@ -70,15 +71,25 @@ int main(int argc, char* argv[]) {
     }
 
     const auto contents = scp::getContents(arguments[1]);
+    const size_t nIters = 25;
+    const bool debug = false;
 
     auto range = contents                                                        //
                  | std::ranges::views::split(std::string_view(" "))              //
                  | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
                  | std::ranges::views::transform(scp::Parser<size_t>());
 
-    auto tokens = std::vector(range.begin(), range.end());
-    for (int i = 0; i < 25; ++i) {
-        tokens = iterate(tokens);
+    for (size_t j = 1; j <= nIters; ++j) {
+        auto tokens = std::vector(range.begin(), range.end());
+        for (size_t i = 0; i < j; ++i) {
+            tokens = iterate(tokens);
+            if (debug) {
+                for (auto tok : tokens) {
+                    std::cout << tok << " ";
+                }
+                std::cout << std::endl;
+            }
+        }
+        std::cout << j << " answer: " << tokens.size() << std::endl;
     }
-    std::cout << "part1 answer: " << tokens.size() << std::endl;
 }
