@@ -1,5 +1,6 @@
 
 #include "lib/file_utils.hpp"
+#include "lib/hash_utils.hpp"
 #include "lib/transform.hpp"
 
 #include <algorithm>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <optional>
 #include <ranges>
+#include <unordered_map>
 #include <vector>
 
 /**
@@ -60,6 +62,29 @@ std::vector<size_t> iterate(const std::vector<size_t>& tokens) {
     return result;
 }
 
+size_t recurse(const size_t token, const size_t remainingBlinks,
+               std::unordered_map<std::pair<size_t, size_t>, size_t>& memos) {
+    if (0 == remainingBlinks) {
+        return 1;
+    }
+    auto iter = memos.find({token, remainingBlinks});
+    if (iter != memos.end()) {
+        return (*iter).second;
+    }
+    size_t decBlinks = remainingBlinks - 1;
+    size_t result;
+    if (0 == token) {
+        result = recurse(1, decBlinks, memos);
+    } else if (evenDigits(token)) {
+        auto [t1, t2] = splitDigits(token);
+        result = recurse(t1, decBlinks, memos) + recurse(t2, decBlinks, memos);
+    } else {
+        result = recurse(token * 2024, decBlinks, memos);
+    }
+    memos.emplace(std::make_pair(token, remainingBlinks), result);
+    return result;
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -71,25 +96,34 @@ int main(int argc, char* argv[]) {
     }
 
     const auto contents = scp::getContents(arguments[1]);
-    const size_t nIters = 25;
-    const bool debug = false;
-
     auto range = contents                                                        //
                  | std::ranges::views::split(std::string_view(" "))              //
                  | std::ranges::views::filter([](auto s) { return !s.empty(); }) //
                  | std::ranges::views::transform(scp::Parser<size_t>());
 
-    for (size_t j = 1; j <= nIters; ++j) {
-        auto tokens = std::vector(range.begin(), range.end());
-        for (size_t i = 0; i < j; ++i) {
-            tokens = iterate(tokens);
-            if (debug) {
-                for (auto tok : tokens) {
-                    std::cout << tok << " ";
-                }
-                std::cout << std::endl;
+    auto tokens = std::vector(range.begin(), range.end());
+    const size_t nIters = 25;
+    const bool debug = false;
+    for (size_t i = 0; i < nIters; ++i) {
+        tokens = iterate(tokens);
+        if (debug) {
+            for (auto tok : tokens) {
+                std::cout << tok << " ";
             }
+            std::cout << std::endl;
         }
-        std::cout << j << " answer: " << tokens.size() << std::endl;
     }
+    std::cout << "part1 answer: " << tokens.size() << std::endl;
+
+    std::unordered_map<std::pair<size_t, size_t>, size_t> memos;
+    size_t part2Result = 0;
+    tokens = std::vector(range.begin(), range.end());
+    for (auto token : tokens) {
+        part2Result += recurse(token, 75, memos);
+    }
+    // for (auto kv : memos) {
+    //     std::cout << "n: " << kv.first.first << ", remain:" << kv.first.second
+    //               << ", result: " << kv.second << std::endl;
+    // }
+    std::cout << "part2 answer: " << part2Result << std::endl;
 }
