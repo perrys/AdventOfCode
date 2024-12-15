@@ -26,22 +26,43 @@
 
 namespace {
 
+struct HorizontalSort {
+    bool operator()(const scp::Coordinate& lhs, const scp::Coordinate& rhs) {
+        if (lhs.ix != rhs.ix) {
+            return lhs.ix < rhs.ix;
+        }
+        return lhs.iy < rhs.iy;
+    }
+};
+
+struct VerticalSort {
+    bool operator()(const scp::Coordinate& lhs, const scp::Coordinate& rhs) {
+        if (lhs.iy != rhs.iy) {
+            return lhs.iy < rhs.iy;
+        }
+        return lhs.ix < rhs.ix;
+    }
+};
+
 struct Region {
     char kind;
     std::vector<scp::Coordinate> tiles;
+
     void consume(Region& other) {
         assert(this->kind == other.kind);
         std::copy(other.tiles.begin(), other.tiles.end(), std::back_inserter(this->tiles));
         other.tiles.clear();
     }
+
     size_t area() const {
         return this->tiles.size();
     }
+
     size_t perimeter(const scp::Grid& grid) const {
         const std::array<scp::Direction, 4> directions{scp::NORTH, scp::SOUTH, scp::EAST,
                                                        scp::WEST};
         size_t perimeter = 0;
-        for (auto coord : tiles) {
+        for (auto coord : this->tiles) {
             for (auto dir : directions) {
                 auto otherKind = grid.getWithOffsets(coord, dir);
                 if (!otherKind.has_value() || otherKind.value() != this->kind) {
@@ -50,6 +71,54 @@ struct Region {
             }
         }
         return perimeter;
+    }
+
+    static size_t countEdges(scp::Direction dir, std::vector<scp::Coordinate>& edges) {
+        bool verticalSort = dir == scp::NORTH || dir == scp::SOUTH;
+        if (verticalSort) {
+            std::ranges::sort(edges, VerticalSort());
+
+        } else {
+            std::ranges::sort(edges, HorizontalSort());
+        }
+        std::optional<scp::Coordinate> last;
+        auto differentEdgeTest = [verticalSort, &last](auto& edge) {
+            if (verticalSort) {
+                return edge.ix != (last->ix + 1) || edge.iy != last->iy;
+            } else {
+                return edge.iy != (last->iy + 1) || edge.ix != last->ix;
+            }
+        };
+        size_t count = 0;
+        for (const auto& edge : edges) {
+            if (!last) {
+                count += 1;
+            } else if (differentEdgeTest(edge)) {
+                count += 1;
+            }
+            last = edge;
+        }
+        return count;
+    }
+
+    size_t numberOfEdges(const scp::Grid& grid) const {
+        const std::array<scp::Direction, 4> directions{scp::NORTH, scp::SOUTH, scp::EAST,
+                                                       scp::WEST};
+        std::unordered_map<scp::Direction, std::vector<scp::Coordinate>> directedEdges;
+        for (auto coord : this->tiles) {
+            for (auto dir : directions) {
+                auto otherKind = grid.getWithOffsets(coord, dir);
+                if (!otherKind.has_value() || otherKind.value() != this->kind) {
+                    directedEdges[dir].push_back(coord);
+                }
+            }
+        }
+        size_t count = 0;
+        for (auto& kv : directedEdges) {
+            auto& [dir, edge] = kv;
+            count += countEdges(dir, edge);
+        }
+        return count;
     }
 };
 
@@ -109,23 +178,12 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // for (auto line : gridMap) {
-    //     for (auto region : line) {
-    //         std::cout << region << ", ";
-    //     }
-    //     std::cout << "\n";
-    // }
-
-    size_t total = 0;
+    size_t part1Total = 0;
+    size_t part2Total = 0;
     for (auto region : regions) {
-        // std::cout << idx << "-----" << region.kind << std::endl;
-        // ++idx;
-        // for (auto tile : region.tiles) {
-        //     std::cout << tile << std::endl;
-        // }
-        // std::cout << "area: " << region.area() << ", perim: " << region.perimeter(grid)
-        //           << std::endl;
-        total += region.area() * region.perimeter(grid);
+        part1Total += region.area() * region.perimeter(grid);
+        part2Total += region.area() * region.numberOfEdges(grid);
     }
-    std::cout << "part1 total: " << total << std::endl;
+    std::cout << "part1 total: " << part1Total << std::endl;
+    std::cout << "part2 total: " << part2Total << std::endl;
 }
