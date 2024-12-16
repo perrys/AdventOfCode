@@ -39,19 +39,22 @@ struct Block {
         assert(lines[idx].starts_with("Button A"));
         std::smatch smatch;
 
-        assert(std::regex_match(lines[idx++], smatch, buttonMatch));
+        [[maybe_unused]] bool flag = std::regex_match(lines[idx++], smatch, buttonMatch);
+        assert(flag);
         result.xmoves.push_back(
             scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value());
         result.xmoves.push_back(
             scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value());
 
-        assert(std::regex_match(lines[idx++], smatch, buttonMatch));
+        flag = std::regex_match(lines[idx++], smatch, buttonMatch);
+        assert(flag);
         result.ymoves.push_back(
             scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value());
         result.ymoves.push_back(
             scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value());
 
-        assert(std::regex_match(lines[idx++], smatch, targetMatch));
+        flag = std::regex_match(lines[idx++], smatch, targetMatch);
+        assert(flag);
         result.xytarget.push_back(static_cast<double>(
             scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value()));
         result.xytarget.push_back(static_cast<double>(
