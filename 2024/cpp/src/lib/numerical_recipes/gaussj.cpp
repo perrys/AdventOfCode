@@ -13,7 +13,7 @@ On output, a is replaced by its matrix inverse, and b is replaced by the corresp
 solution vectors.
 */
 void gaussj(MatDoub_IO& a, MatDoub_IO& b) {
-    Int i, icol, irow, j, k, l, ll, n = a.nrows(), m = b.ncols();
+    Int i, icol = 0, irow = 0, j, k, l, ll, n = a.nrows(), m = b.ncols();
     Doub big, dum, pivinv;
     VecInt indxc(n), indxr(n), ipiv(n);
     for (j = 0; j < n; j++)
