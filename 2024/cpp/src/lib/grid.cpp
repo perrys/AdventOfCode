@@ -45,6 +45,15 @@ std::optional<char> Grid::getWithOffsets(Coordinate c, Direction d) const {
     }
     return this->get({c.ix + d.dx, c.iy + d.dy});
 }
+
+void Grid::print() const {
+    for (size_t row = 0; row < this->height(); ++row) {
+        for (size_t col = 0; col < this->width(); ++col) {
+            std::cout << this->get({col, row}).value();
+        }
+        std::cout << "\n";
+    }
+}
 } // namespace scp
 
 std::ostream& operator<<(std::ostream& out, const scp::Coordinate& c) {

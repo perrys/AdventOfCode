@@ -61,6 +61,8 @@ class Grid {
     void set(Coordinate xy, char c);
     std::optional<char> getWithOffsets(Coordinate xy, Direction dxy) const;
 
+    void print() const;
+
     static Grid create(std::vector<std::string>&& lines);
 };
 
