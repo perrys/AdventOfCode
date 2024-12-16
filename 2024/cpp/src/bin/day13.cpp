@@ -60,16 +60,16 @@ struct Block {
         return result;
     }
 
-    size_t solve() {
+    size_t solve() const {
         std::vector<double> coefficients{
             static_cast<double>(this->xmoves[0]), static_cast<double>(this->ymoves[0]),
             static_cast<double>(this->xmoves[1]), static_cast<double>(this->ymoves[1])};
         std::vector<double> targets(this->xytarget);
         nr::guassJordanElimination(coefficients.data(), targets.data(), 2);
-        // targets now holds the result (double-precision)
+        // targets now holds the number of moves (double-precision)
         for (int i = 0; i < 2; ++i) {
             const auto rounded = std::round(targets[i]);
-
+            // had to relax the tollerance for part 2 - should've solved these with integer arithmetic..
             if (std::abs(rounded - targets[i]) > 0.001 || targets[i] < 0
                 //|| targets[i] > 100
             ) {
