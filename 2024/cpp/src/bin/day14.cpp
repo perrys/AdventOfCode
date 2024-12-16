@@ -40,7 +40,8 @@ struct Robot {
         assert(line.starts_with("p="));
         std::smatch smatch;
 
-        assert(std::regex_match(line, smatch, matcher));
+        [[maybe_unused]] bool flag = std::regex_match(line, smatch, matcher);
+        assert(flag);
         result.px = scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value();
         result.py = scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value();
         result.dx = scp::parseInt::parse(&*smatch[3].first, &*smatch[3].second).value();
@@ -66,6 +67,8 @@ int main(int argc, char* argv[]) {
         return {};
     }
     auto lines = scp::getLines(arguments[1]);
+    std::vector<Robot> robots;
+    std::transform(lines.begin(), lines.end(), std::back_inserter(robots), Robot::parse);
 
     const size_t width = 101;
     const size_t height = 103;
@@ -77,8 +80,7 @@ int main(int argc, char* argv[]) {
     const size_t bottom = top + 1;
 
     std::array<size_t, 4> quadrants{0, 0, 0, 0};
-    for (auto line : lines) {
-        auto robot = Robot::parse(line);
+    for (const auto& robot : robots) {
         Coord pos = robot.move(width, height, turns);
         if (pos.ix < left && pos.iy < top) {
             quadrants[0] += 1;
@@ -93,4 +95,34 @@ int main(int argc, char* argv[]) {
     std::cout << "part1 total: "
               << std::accumulate(quadrants.begin(), quadrants.end(), 1, std::multiplies<>())
               << std::endl;
+
+    for (int i = 0; i < 100000; ++i) {
+        std::unordered_map<scp::Coordinate, size_t> locations;
+        for (const auto& robot : robots) {
+            Coord pos = robot.move(width, height, i);
+            locations[pos] += 1;
+        }
+        // initially checked for left-right symmetry, but the answer is not symmetric across the
+        // entire width. Just check for a long-ish line of hits
+        for (size_t iy = 0; iy < height; ++iy) {
+            size_t count = 0;
+            for (size_t ix = 0; ix < width; ++ix) {
+                bool isRobot = locations.find({ix, iy}) != locations.end();
+                // std::cout << (isRobot ? "." : "*");
+                if (isRobot) {
+                    count += 1;
+                } else {
+                    count = 0;
+                }
+                if (count > 10) {
+                    goto done;
+                }
+            }
+            // std::cout << "\n";
+        }
+        continue;
+    done:
+        std::cout << "part2 answer: " << i << std::endl;
+        break;
+    }
 }
