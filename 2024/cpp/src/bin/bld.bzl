@@ -5,5 +5,5 @@ def all_binaries(bins):
         native.cc_binary(
             name = base,
             srcs = [file],
-            deps = ["//lib:scp"],
+            deps = ["//lib:scp", "//lib:nr"],
         )

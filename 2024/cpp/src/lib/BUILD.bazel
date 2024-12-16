@@ -5,3 +5,11 @@ cc_library(
     visibility = ["//bin:__subpackages__"],
 )
 
+# Numerical Recipies library
+cc_library(
+    name = "nr",
+    srcs = glob(["numerical_recipes/*.cpp", "numerical_recipes/*.inc"]),
+    hdrs = glob(["numerical_recipes/*.hpp"]),
+    visibility = ["//bin:__subpackages__"],
+)
+
