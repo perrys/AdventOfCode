@@ -32,7 +32,7 @@ const std::regex targetMatch("Prize: X=(\\d+), Y=(\\d+)");
 struct Block {
     std::vector<int> xmoves;
     std::vector<int> ymoves;
-    std::vector<int> xytarget;
+    std::vector<double> xytarget;
 
     static Block parse(const std::vector<std::string>& lines, size_t idx) {
         Block result;
@@ -52,10 +52,10 @@ struct Block {
             scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value());
 
         assert(std::regex_match(lines[idx++], smatch, targetMatch));
-        result.xytarget.push_back(
-            scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value());
-        result.xytarget.push_back(
-            scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value());
+        result.xytarget.push_back(static_cast<double>(
+            scp::parseInt::parse(&*smatch[1].first, &*smatch[1].second).value()));
+        result.xytarget.push_back(static_cast<double>(
+            scp::parseInt::parse(&*smatch[2].first, &*smatch[2].second).value()));
 
         return result;
     }
@@ -64,14 +64,15 @@ struct Block {
         std::vector<double> coefficients{
             static_cast<double>(this->xmoves[0]), static_cast<double>(this->ymoves[0]),
             static_cast<double>(this->xmoves[1]), static_cast<double>(this->ymoves[1])};
-        std::vector<double> targets{static_cast<double>(this->xytarget[0]),
-                                    static_cast<double>(this->xytarget[1])};
+        std::vector<double> targets(this->xytarget);
         nr::guassJordanElimination(coefficients.data(), targets.data(), 2);
         // targets now holds the result (double-precision)
         for (int i = 0; i < 2; ++i) {
             const auto rounded = std::round(targets[i]);
 
-            if (std::abs(rounded - targets[i]) > 0.0000001 || targets[i] < 0 || targets[i] > 100) {
+            if (std::abs(rounded - targets[i]) > 0.001 || targets[i] < 0
+                //|| targets[i] > 100
+            ) {
                 // no exact solution
                 return 0;
             }
@@ -95,9 +96,15 @@ int main(int argc, char* argv[]) {
     auto lines = scp::getLines(arguments[1]);
 
     size_t part1Total = 0;
+    size_t part2Total = 0;
     for (size_t i = 0; i < lines.size(); i += 4) {
         auto block = Block::parse(lines, i);
         part1Total += block.solve();
+        for (size_t j = 0; j < 2; ++j) {
+            block.xytarget[j] += 10000000000000;
+        }
+        part2Total += block.solve();
     }
     std::cout << "part1 answer: " << part1Total << std::endl;
+    std::cout << "part2 answer: " << part2Total << std::endl;
 }
