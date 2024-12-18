@@ -17,6 +17,9 @@ struct Direction {
     Direction operator+(const Direction& other) const {
         return {this->dx + other.dx, this->dy + other.dy};
     }
+    Direction opposite() const {
+        return {this->dx * -1, this->dy * -1};
+    }
 };
 
 extern const Direction NORTH;
@@ -61,6 +64,17 @@ class Grid {
     void set(Coordinate xy, char c);
     std::optional<char> getWithOffsets(Coordinate xy, Direction dxy) const;
 
+    template <typename F> std::optional<Coordinate> search(F predicate) {
+        for (size_t iy = 0; iy < this->height(); ++iy) {
+            for (size_t ix = 0; ix < this->width(); ++ix) {
+                if (predicate(this->rows.at(iy).at(ix))) {
+                    return {{ix, iy}};
+                }
+            }
+        }
+        return {};
+    }
+
     void print() const;
 
     static Grid create(std::vector<std::string>&& lines);
@@ -86,3 +100,4 @@ template <> struct hash<scp::Direction> {
 } // namespace std
 
 std::ostream& operator<<(std::ostream& out, const scp::Coordinate& c);
+std::ostream& operator<<(std::ostream& out, const scp::Direction& c);

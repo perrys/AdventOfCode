@@ -60,3 +60,22 @@ std::ostream& operator<<(std::ostream& out, const scp::Coordinate& c) {
     out << "(" << c.ix << "," << c.iy << ")";
     return out;
 }
+std::ostream& operator<<(std::ostream& out, const scp::Direction& d) {
+    switch (d.dy) {
+    case -1:
+        out << "^";
+        break;
+    case 1:
+        out << "v";
+        break;
+    }
+    switch (d.dx) {
+    case -1:
+        out << "<";
+        break;
+    case 1:
+        out << ">";
+        break;
+    }
+    return out;
+}
