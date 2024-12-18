@@ -30,7 +30,7 @@ namespace {
 struct PathStep { // a Ray
     scp::Coordinate loc;
     scp::Direction dir;
-    std::optional<std::pair<scp::Coordinate, scp::Direction>> prev;
+    std::vector<std::pair<scp::Coordinate, scp::Direction>> prev;
 
     bool operator==(const PathStep& other) const {
         return this->loc == other.loc && this->dir == other.dir;
@@ -56,8 +56,9 @@ std::vector<PathStep> neighbours(const scp::Grid& grid, PathStep current) {
     std::vector<PathStep> result;
     for (auto dir : DIRECTIONS) {
         if (dir != current.dir.opposite() && grid.getWithOffsets(current.loc, dir) != '#') {
-            result.push_back(
-                {current.loc.move(dir), dir, std::make_pair(current.loc, current.dir)});
+            std::vector<std::pair<scp::Coordinate, scp::Direction>> prev{
+                {current.loc, current.dir}};
+            result.push_back({current.loc.move(dir), dir, std::move(prev)});
         }
     }
     return result;
@@ -67,14 +68,15 @@ size_t directionCost(scp::Direction current, scp::Direction next) {
     const size_t rotationCost = 1000;
     return (current == next) ? 0 : rotationCost;
 }
+using Path = std::vector<PathStep>;
 
-[[maybe_unused]] std::vector<PathStep> reconstructPath(std::unordered_map<PathStep, size_t> costs,
-                                                       PathStep end) {
-    std::vector<PathStep> result;
+// TODO: this now needs to be a recursive search. Probably just count the tiles
+[[maybe_unused]] Path reconstructPath(std::unordered_map<PathStep, size_t> costs, PathStep end) {
+    Path result;
     PathStep step = end;
     while (true) {
         result.push_back(step);
-        if (!step.prev) {
+        if (step.prev.empty()) {
             break;
         }
         PathStep test{step.prev->first, step.prev->second, {}};
@@ -86,7 +88,8 @@ size_t directionCost(scp::Direction current, scp::Direction next) {
     return result;
 }
 
-size_t dijkstra(const scp::Grid& grid, PathStep start, scp::Coordinate end) {
+std::vector<std::pair<Path, size_t>> dijkstra(const scp::Grid& grid, PathStep start,
+                                              scp::Coordinate end) {
 
     std::vector<PathStep> queue{start};
     std::unordered_map<PathStep, size_t> costs{{start, 0}};
@@ -97,6 +100,7 @@ size_t dijkstra(const scp::Grid& grid, PathStep start, scp::Coordinate end) {
         return costs[rhs] < costs[lhs]; // reverse order
     };
 
+    std::vector<std::pair<Path, size_t>> paths;
     size_t minCost = std::numeric_limits<size_t>::max();
     while (!queue.empty()) {
         std::ranges::sort(queue.begin(), queue.end(), sorter);
@@ -106,17 +110,21 @@ size_t dijkstra(const scp::Grid& grid, PathStep start, scp::Coordinate end) {
         const size_t currentCost = costs[current];
         for (auto nextStep : neighbours(grid, current)) {
             size_t newCost = currentCost + directionCost(current.dir, nextStep.dir) + 1;
-            bool minimal = !costs.contains(nextStep) || newCost < costs[nextStep];
+            bool minimal = !costs.contains(nextStep) || newCost <= costs[nextStep];
             if (minimal) {
-                queue.push_back(nextStep);
                 costs.insert_or_assign(nextStep, newCost);
-                if (nextStep.loc == end && newCost < minCost) {
+                if (nextStep.loc == end && newCost <= minCost) {
                     minCost = newCost;
+                    paths.emplace_back(reconstructPath(costs, nextStep), newCost);
+                } else {
+                    queue.push_back(nextStep);
                 }
             }
         }
     }
-    return minCost;
+    std::erase_if(paths, [minCost](auto p) { return p.second != minCost; });
+    std::cout << "# optimal paths: " << paths.size() << std::endl;
+    return paths;
 }
 
 } // namespace
@@ -134,6 +142,24 @@ int main(int argc, char* argv[]) {
     std::optional<scp::Coordinate> end = grid.search([](auto c) { return c == 'E'; });
     assert(start.has_value() && end.has_value());
 
-    const auto cost = dijkstra(grid, {start.value(), scp::EAST, {}}, end.value());
-    std::cout << "part1 answer = " << cost << std::endl;
+    const auto pathCosts = dijkstra(grid, {start.value(), scp::EAST, {}}, end.value());
+    std::cout << "part1 answer = " << pathCosts[0].second << std::endl;
+    std::unordered_set<scp::Coordinate> tiles;
+    for (auto kv : pathCosts) {
+        auto [path, cost] = kv;
+        for (auto step : path) {
+            tiles.insert(step.loc);
+        }
+    }
+    for (size_t iy = 0; iy < grid.height(); ++iy) {
+        for (size_t ix = 0; ix < grid.width(); ++ix) {
+            if (tiles.contains({ix, iy})) {
+                std::cout << 'O';
+            } else {
+                std::cout << grid.get({ix, iy}).value();
+            }
+        }
+        std::cout << "\n";
+    }
+    std::cout << "part2 answer = " << tiles.size() << std::endl;
 }
