@@ -67,7 +67,6 @@ size_t directionCost(scp::Direction current, scp::Direction next) {
 }
 using Path = std::vector<PathStep>;
 
-// TODO: this now needs to be a recursive search. Probably just count the tiles
 void countTiles(const std::unordered_map<PathStep, Path>& links, PathStep step,
                 std::unordered_set<scp::Coordinate>& uniqueSet,
                 std::unordered_set<PathStep>* visited = nullptr) {
