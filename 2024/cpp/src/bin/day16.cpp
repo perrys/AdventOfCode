@@ -30,7 +30,6 @@ namespace {
 struct PathStep { // a Ray
     scp::Coordinate loc;
     scp::Direction dir;
-    std::vector<std::pair<scp::Coordinate, scp::Direction>> prev;
 
     bool operator==(const PathStep& other) const {
         return this->loc == other.loc && this->dir == other.dir;
@@ -56,9 +55,7 @@ std::vector<PathStep> neighbours(const scp::Grid& grid, PathStep current) {
     std::vector<PathStep> result;
     for (auto dir : DIRECTIONS) {
         if (dir != current.dir.opposite() && grid.getWithOffsets(current.loc, dir) != '#') {
-            std::vector<std::pair<scp::Coordinate, scp::Direction>> prev{
-                {current.loc, current.dir}};
-            result.push_back({current.loc.move(dir), dir, std::move(prev)});
+            result.push_back({current.loc.move(dir), dir});
         }
     }
     return result;
@@ -71,25 +68,29 @@ size_t directionCost(scp::Direction current, scp::Direction next) {
 using Path = std::vector<PathStep>;
 
 // TODO: this now needs to be a recursive search. Probably just count the tiles
-[[maybe_unused]] Path reconstructPath(std::unordered_map<PathStep, size_t> costs, PathStep end) {
-    Path result;
-    PathStep step = end;
-    while (true) {
-        result.push_back(step);
-        if (step.prev.empty()) {
-            break;
-        }
-        PathStep test{step.prev->first, step.prev->second, {}};
-        auto iter = costs.find(test);
-        assert(iter != costs.end());
-        step = (*iter).first;
+void countTiles(const std::unordered_map<PathStep, Path>& links, PathStep step,
+                std::unordered_set<scp::Coordinate>& uniqueSet,
+                std::unordered_set<PathStep>* visited = nullptr) {
+    std::unique_ptr<std::unordered_set<PathStep>> first;
+    if (nullptr == visited) {
+        first.reset(new std::unordered_set<PathStep>);
+        visited = first.get();
     }
-    std::ranges::reverse(result);
-    return result;
+    if (visited->contains(step)) {
+        return;
+    }
+    visited->insert(step);
+    uniqueSet.insert(step.loc);
+    auto iter = links.find(step);
+    if (iter != links.end()) {
+        for (const auto& prev : (*iter).second) {
+            countTiles(links, prev, uniqueSet, visited);
+        }
+    }
 }
 
-std::vector<std::pair<Path, size_t>> dijkstra(const scp::Grid& grid, PathStep start,
-                                              scp::Coordinate end) {
+void dijkstra(const scp::Grid& grid, PathStep start, scp::Coordinate end, size_t& minCost,
+              size_t& nTiles) {
 
     std::vector<PathStep> queue{start};
     std::unordered_map<PathStep, size_t> costs{{start, 0}};
@@ -100,8 +101,10 @@ std::vector<std::pair<Path, size_t>> dijkstra(const scp::Grid& grid, PathStep st
         return costs[rhs] < costs[lhs]; // reverse order
     };
 
-    std::vector<std::pair<Path, size_t>> paths;
-    size_t minCost = std::numeric_limits<size_t>::max();
+    std::unordered_map<PathStep, Path> backlinks;
+
+    minCost = std::numeric_limits<size_t>::max();
+    PathStep minEnd;
     while (!queue.empty()) {
         std::ranges::sort(queue.begin(), queue.end(), sorter);
         const auto current = queue.back();
@@ -110,21 +113,27 @@ std::vector<std::pair<Path, size_t>> dijkstra(const scp::Grid& grid, PathStep st
         const size_t currentCost = costs[current];
         for (auto nextStep : neighbours(grid, current)) {
             size_t newCost = currentCost + directionCost(current.dir, nextStep.dir) + 1;
-            bool minimal = !costs.contains(nextStep) || newCost <= costs[nextStep];
+            bool minimal = !costs.contains(nextStep) || newCost < costs[nextStep];
             if (minimal) {
                 costs.insert_or_assign(nextStep, newCost);
-                if (nextStep.loc == end && newCost <= minCost) {
+                std::vector<PathStep> prev{current};
+                backlinks.insert_or_assign(nextStep, std::move(prev));
+                if (nextStep.loc == end && newCost < minCost) {
                     minCost = newCost;
-                    paths.emplace_back(reconstructPath(costs, nextStep), newCost);
+                    minEnd = nextStep;
                 } else {
                     queue.push_back(nextStep);
                 }
+            } else if (newCost == costs[nextStep]) {
+                backlinks[nextStep].push_back(current);
+                queue.push_back(nextStep);
             }
         }
     }
-    std::erase_if(paths, [minCost](auto p) { return p.second != minCost; });
-    std::cout << "# optimal paths: " << paths.size() << std::endl;
-    return paths;
+    std::cout << "min: " << minCost << std::endl;
+    std::unordered_set<scp::Coordinate> uniqueTiles;
+    countTiles(backlinks, minEnd, uniqueTiles);
+    nTiles = uniqueTiles.size();
 }
 
 } // namespace
@@ -142,24 +151,8 @@ int main(int argc, char* argv[]) {
     std::optional<scp::Coordinate> end = grid.search([](auto c) { return c == 'E'; });
     assert(start.has_value() && end.has_value());
 
-    const auto pathCosts = dijkstra(grid, {start.value(), scp::EAST, {}}, end.value());
-    std::cout << "part1 answer = " << pathCosts[0].second << std::endl;
-    std::unordered_set<scp::Coordinate> tiles;
-    for (auto kv : pathCosts) {
-        auto [path, cost] = kv;
-        for (auto step : path) {
-            tiles.insert(step.loc);
-        }
-    }
-    for (size_t iy = 0; iy < grid.height(); ++iy) {
-        for (size_t ix = 0; ix < grid.width(); ++ix) {
-            if (tiles.contains({ix, iy})) {
-                std::cout << 'O';
-            } else {
-                std::cout << grid.get({ix, iy}).value();
-            }
-        }
-        std::cout << "\n";
-    }
-    std::cout << "part2 answer = " << tiles.size() << std::endl;
+    size_t minCost, ntiles;
+    dijkstra(grid, {start.value(), scp::EAST}, end.value(), minCost, ntiles);
+    std::cout << "part1 answer = " << minCost << std::endl;
+    std::cout << "part2 answer = " << ntiles << std::endl;
 }
