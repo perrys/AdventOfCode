@@ -76,11 +76,12 @@ struct CPU {
         return ostream;
     }
 
-    void execute(const std::vector<int>& program) {
+    auto execute(const std::vector<int>& program) -> std::vector<int> {
         const bool debug = false;
         if (debug) {
             this->output(std::cout);
         }
+        std::vector<int> output;
 
         while (this->pc < program.size()) {
             auto opcode = program.at(this->pc);
@@ -113,7 +114,7 @@ struct CPU {
                 this->pc += 2;
                 break;
             case 5: // out
-                std::cout << comboOperand(operand) % 8 << ",";
+                output.push_back(comboOperand(operand) % 8);
                 this->pc += 2;
                 break;
             case 6: // bdv
@@ -129,9 +130,23 @@ struct CPU {
                 this->output(std::cout);
             }
         }
+        return output;
     }
 };
 } // namespace
+
+std::ostream& operator<<(std::ostream& ostream, const std::vector<int>& vals) {
+    bool first = true;
+    for (auto i : vals) {
+        if (first) {
+            first = false;
+        } else {
+            std::cout << ",";
+        }
+        std::cout << i;
+    }
+    return ostream;
+}
 
 int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv, argv + argc);
@@ -152,5 +167,20 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    cpu.execute(program);
+    auto output = cpu.execute(program);
+
+    std::cout << "part1 answer: " << output << std::endl;
+
+    cpu = CPU::parse(lines);
+    constexpr int ntries = 200'000'000;
+    for (int i = 0; i < ntries; ++i) {
+        CPU copy = cpu;
+        copy.regA = i;
+        auto output = copy.execute(program);
+        if (output == program) {
+            std::cout << "part2 answer: " << i << std::endl;
+            return 0;
+        }
+    }
+    std::cout << "couldn't find part2 answer after " << ntries << " tries :(" << std::endl;
 }
