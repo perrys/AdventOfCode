@@ -51,6 +51,8 @@ std::vector<scp::Coordinate> neighbours(const scp::Grid& grid, scp::Coordinate c
     return result;
 }
 
+constexpr const size_t SENTINEL = std::numeric_limits<size_t>::max();
+
 void dijkstra(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end, size_t& minCost) {
 
     std::vector<scp::Coordinate> queue{start};
@@ -62,7 +64,7 @@ void dijkstra(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end,
         return costs[rhs] < costs[lhs]; // reverse order
     };
 
-    minCost = std::numeric_limits<size_t>::max();
+    minCost = SENTINEL;
     while (!queue.empty()) {
         std::ranges::sort(queue.begin(), queue.end(), sorter);
         const auto current = queue.back();
@@ -93,15 +95,23 @@ int main(int argc, char* argv[]) {
         return {};
     }
 
+#if 0
+    constexpr size_t dimension = 7;
+    constexpr size_t count = 12;
+#else
     constexpr size_t dimension = 71;
     constexpr size_t count = 1024;
-    std::vector<std::string> gridlines;
-    for (size_t i = 0; i < dimension; ++i) {
-        gridlines.emplace_back(dimension, '.');
-    }
-    scp::Grid grid(std::move(gridlines));
+#endif
+
+    const auto gridlines = [dimension]() -> std::vector<std::string> {
+        std::vector<std::string> glines;
+        for (size_t i = 0; i < dimension; ++i) {
+            glines.emplace_back(dimension, '.');
+        }
+        return glines;
+    }();
     auto lines = scp::getLines(arguments[1]);
-    size_t idx = 0;
+    std::vector<scp::Coordinate> positions;
     for (auto line : lines | std::ranges::views::filter([](auto s) { return !s.empty(); })) {
         auto numbers =                                                      //
             line                                                            //
@@ -111,15 +121,31 @@ int main(int argc, char* argv[]) {
         assert(std::distance(numbers.begin(), numbers.end()) == 2);
         auto iter = numbers.begin();
         scp::Coordinate xy(*iter++, *iter++);
-        grid.set(xy, '#');
-        idx += 1;
-        if (idx == count) {
-            break;
-        }
+        positions.push_back(xy);
     }
 
-    grid.print();
+    scp::Grid grid({gridlines.begin(), gridlines.end()});
+    for (size_t i = 0; i < count; ++i) {
+        grid.set(positions.at(i), '#');
+    }
     size_t minCost;
     dijkstra(grid, {0, 0}, {dimension - 1, dimension - 1}, minCost);
     std::cout << "part1 answer: " << minCost << std::endl;
+
+    // Brute force - this takes about 7 seconds to come up with an answer with an optimized
+    // build. There is clearly a cleverer way to do it (maybe by re-using a subset of the previous
+    // dijkstra calculations) but I'm already 4 days behind so this will be good enough :(
+    for (size_t i = count; i < positions.size(); ++i) {
+        auto newgrid = scp::Grid({gridlines.begin(), gridlines.end()});
+        for (size_t j = 0; j < i; ++j) {
+            newgrid.set(positions.at(j), '#');
+        }
+        dijkstra(newgrid, {0, 0}, {dimension - 1, dimension - 1}, minCost);
+        if (minCost == SENTINEL) {
+            std::cout << "part2 answer: " << positions.at(i - 1) << std::endl;
+            return 0;
+        }
+    }
+    std::cerr << "couldn't find solution to part 2" << std::endl;
+    return -1;
 }
