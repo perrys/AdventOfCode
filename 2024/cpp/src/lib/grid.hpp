@@ -64,7 +64,7 @@ class Grid {
     void set(Coordinate xy, char c);
     std::optional<char> getWithOffsets(Coordinate xy, Direction dxy) const;
 
-    template <typename F> std::optional<Coordinate> search(F predicate) {
+    template <typename F> std::optional<Coordinate> search(F predicate) const {
         for (size_t iy = 0; iy < this->height(); ++iy) {
             for (size_t ix = 0; ix < this->width(); ++ix) {
                 if (predicate(this->rows.at(iy).at(ix))) {
