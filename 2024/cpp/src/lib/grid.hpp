@@ -77,6 +77,17 @@ class Grid {
 
     void print() const;
 
+    template <typename T> void print(const T& path) const {
+        for (size_t row = 0; row < this->height(); ++row) {
+            for (size_t col = 0; col < this->width(); ++col) {
+                auto val = this->get({col, row}).value();
+                val = (val == '.' ? ' ' : val);
+                std::cout << (path.contains({col, row}) ? 'o' : val);
+            }
+            std::cout << "\n";
+        }
+    }
+
     static Grid create(std::vector<std::string>&& lines);
 };
 
