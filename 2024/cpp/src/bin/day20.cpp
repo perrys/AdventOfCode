@@ -27,16 +27,11 @@
 namespace {
 
 const std::array<scp::Direction, 4> DIRECTIONS{scp::NORTH, scp::SOUTH, scp::WEST, scp::EAST};
-std::vector<scp::Coordinate>
-neighbours(const scp::Grid& grid, scp::Coordinate current,
-           std::optional<std::pair<scp::Coordinate, scp::Coordinate>> cheatTile) {
+std::vector<scp::Coordinate> neighbours(const scp::Grid& grid, scp::Coordinate current) {
     std::vector<scp::Coordinate> result;
     for (auto dir : DIRECTIONS) {
         const auto next = grid.getWithOffsets(current, dir);
-        const bool allowed =
-            next.has_value() && ((cheatTile.has_value() && current == cheatTile->first &&
-                                  current.move(dir) == cheatTile->second) ||
-                                 next.value() != '#');
+        const bool allowed = next.has_value() && next.value() != '#';
         if (allowed) {
             result.push_back(current.move(dir));
         }
@@ -52,7 +47,7 @@ std::unordered_set<scp::Direction> withinRadius(const scp::Grid& grid, scp::Coor
             for (size_t dy = 0; (dy + dx) < distance; ++dy) {
                 auto displacement = dirx * dx + diry * dy;
                 auto next = current.move(displacement);
-                if ((dx + dy) > 0 && grid.get(next) == '.') {
+                if ((dx + dy) > 0 && (grid.get(next) && grid.get(next) != '#')) {
                     result.insert(displacement);
                 }
             }
@@ -82,9 +77,12 @@ void trimPath(Path& backlinks, const scp::Coordinate end) {
 using CostMap = std::unordered_map<scp::Coordinate, size_t>;
 
 void dijkstra(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end, size_t& minCost,
-              std::optional<Path*> backlinks,
-              std::optional<std::pair<scp::Coordinate, scp::Coordinate>> cheatTile) {
+              std::optional<Path*> backlinks) {
 
+    if (start == end) {
+        minCost = 0;
+        return;
+    }
     std::vector<scp::Coordinate> queue{start};
     CostMap costs{{start, 0}};
 
@@ -101,7 +99,7 @@ void dijkstra(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end,
         queue.pop_back();
         assert(costs.contains(current));
         const size_t currentCost = costs[current];
-        for (auto nextStep : neighbours(grid, current, cheatTile)) {
+        for (auto nextStep : neighbours(grid, current)) {
             size_t newCost = currentCost + 1;
             bool minimal = !costs.contains(nextStep) || newCost < costs[nextStep];
             if (minimal) {
@@ -138,7 +136,7 @@ int main(int argc, char* argv[]) {
     const auto end = grid.search([](auto c) { return c == 'E'; }).value();
     size_t minCost;
     Path path;
-    dijkstra(grid, start, end, minCost, &path, {});
+    dijkstra(grid, start, end, minCost, &path);
     std::cout << "shortest: " << minCost << std::endl;
     // grid.print(path);
 
@@ -158,27 +156,39 @@ int main(int argc, char* argv[]) {
     }
 
     size_t part1Count = 0;
+    size_t part2Count = 0;
     CostMap cache = endDistances;
+    auto cachedDijkstra = [&cache](auto grid, auto newStart, auto end, size_t& newCost) {
+        if (cache.contains(newStart)) {
+            newCost = cache[newStart];
+        } else {
+            dijkstra(grid, newStart, end, newCost, {});
+            cache.emplace(newStart, newCost);
+        }
+    };
     for (auto tile : directedPath) {
         auto oldCost = endDistances[tile];
-        auto moves = withinRadius(grid, tile, 3);
-        // std::cout << "--- tile:  " << tile << std::endl;
-        for (auto move : moves) {
+        auto part1Moves = withinRadius(grid, tile, 3);
+        auto part2Moves = withinRadius(grid, tile, 21);
+        for (auto move : part1Moves) {
             auto newStart = tile.move(move);
             size_t newCost;
-            if (cache.contains(newStart)) {
-                newCost = cache[newStart];
-            } else {
-                dijkstra(grid, tile.move(move), end, newCost, {}, {});
-                cache.emplace(newStart, newCost);
-            }
+            cachedDijkstra(grid, newStart, end, newCost);
             newCost += std::abs(move.dx) + std::abs(move.dy);
-            // std::cout << tile.move(move) << ", oldCost: " << oldCost << ", newCost: " << newCost
-            //           << std::endl;
             if (newCost < oldCost && (oldCost - newCost) >= threshold) {
                 part1Count += 1;
             }
         }
+        for (auto move : part2Moves) {
+            auto newStart = tile.move(move);
+            size_t newCost;
+            cachedDijkstra(grid, newStart, end, newCost);
+            newCost += std::abs(move.dx) + std::abs(move.dy);
+            if (newCost < oldCost && (oldCost - newCost) >= threshold) {
+                part2Count += 1;
+            }
+        }
     }
     std::cout << "part1 answer: " << part1Count << std::endl;
+    std::cout << "part2 answer: " << part2Count << std::endl;
 }
