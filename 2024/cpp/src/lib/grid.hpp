@@ -17,6 +17,9 @@ struct Direction {
     Direction operator+(const Direction& other) const {
         return {this->dx + other.dx, this->dy + other.dy};
     }
+    Direction operator*(const int magnitude) const {
+        return {this->dx * magnitude, this->dy * magnitude};
+    }
     Direction opposite() const {
         return {this->dx * -1, this->dy * -1};
     }

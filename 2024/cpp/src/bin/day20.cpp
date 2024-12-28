@@ -44,6 +44,27 @@ neighbours(const scp::Grid& grid, scp::Coordinate current,
     return result;
 }
 
+std::unordered_set<scp::Direction> withinRadius(const scp::Grid& grid, scp::Coordinate current,
+                                                size_t distance) {
+    std::unordered_set<scp::Direction> result;
+    auto explore = [&grid, &result, current, distance](scp::Direction dirx, scp::Direction diry) {
+        for (size_t dx = 0; dx < distance; ++dx) {
+            for (size_t dy = 0; (dy + dx) < distance; ++dy) {
+                auto displacement = dirx * dx + diry * dy;
+                auto next = current.move(displacement);
+                if ((dx + dy) > 0 && grid.get(next) == '.') {
+                    result.insert(displacement);
+                }
+            }
+        }
+    };
+    explore(scp::NORTH, scp::EAST);
+    explore(scp::NORTH, scp::WEST);
+    explore(scp::SOUTH, scp::EAST);
+    explore(scp::SOUTH, scp::WEST);
+    return result;
+}
+
 using Path = std::unordered_map<scp::Coordinate, scp::Coordinate>;
 
 void trimPath(Path& backlinks, const scp::Coordinate end) {
@@ -58,12 +79,14 @@ void trimPath(Path& backlinks, const scp::Coordinate end) {
     backlinks = path;
 }
 
+using CostMap = std::unordered_map<scp::Coordinate, size_t>;
+
 void dijkstra(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end, size_t& minCost,
               std::optional<Path*> backlinks,
               std::optional<std::pair<scp::Coordinate, scp::Coordinate>> cheatTile) {
 
     std::vector<scp::Coordinate> queue{start};
-    std::unordered_map<scp::Coordinate, size_t> costs{{start, 0}};
+    CostMap costs{{start, 0}};
 
     auto sorter = [&costs](scp::Coordinate lhs, scp::Coordinate rhs) {
         assert(costs.contains(lhs));
@@ -119,7 +142,6 @@ int main(int argc, char* argv[]) {
     std::cout << "shortest: " << minCost << std::endl;
     // grid.print(path);
 
-    // just so we can print them in the right order:
     std::vector<scp::Coordinate> directedPath;
     auto prev = path.find(end);
     assert(prev != path.end());
@@ -128,19 +150,33 @@ int main(int argc, char* argv[]) {
         directedPath.push_back((*prev).second);
         prev = path.find(prevTile);
     }
-    std::ranges::reverse(directedPath);
+    CostMap endDistances;
+    size_t distanceToEnd = 1;
+    for (auto c : directedPath) {
+        endDistances.emplace(c, distanceToEnd);
+        distanceToEnd++;
+    }
 
     size_t part1Count = 0;
+    CostMap cache = endDistances;
     for (auto tile : directedPath) {
-        for (auto dir : DIRECTIONS) {
-            if (grid.getWithOffsets(tile, dir) == '#') {
-                auto cheatTile = tile.move(dir);
-                size_t newCost;
-                dijkstra(grid, start, end, newCost, {}, std::make_pair(tile, cheatTile));
-                assert(newCost <= minCost);
-                if ((minCost - newCost) >= threshold) {
-                    part1Count += 1;
-                }
+        auto oldCost = endDistances[tile];
+        auto moves = withinRadius(grid, tile, 3);
+        // std::cout << "--- tile:  " << tile << std::endl;
+        for (auto move : moves) {
+            auto newStart = tile.move(move);
+            size_t newCost;
+            if (cache.contains(newStart)) {
+                newCost = cache[newStart];
+            } else {
+                dijkstra(grid, tile.move(move), end, newCost, {}, {});
+                cache.emplace(newStart, newCost);
+            }
+            newCost += std::abs(move.dx) + std::abs(move.dy);
+            // std::cout << tile.move(move) << ", oldCost: " << oldCost << ", newCost: " << newCost
+            //           << std::endl;
+            if (newCost < oldCost && (oldCost - newCost) >= threshold) {
+                part1Count += 1;
             }
         }
     }
