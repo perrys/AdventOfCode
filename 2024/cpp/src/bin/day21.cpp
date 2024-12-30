@@ -1,5 +1,6 @@
 #include "lib/file_utils.hpp"
 #include "lib/grid.hpp"
+#include "lib/hash_utils.hpp"
 
 #include <assert.h>
 
@@ -79,7 +80,7 @@ std::string toString(MoveList&& path) {
     return buffer.str();
 }
 
-using Cache = std::unordered_map<std::string, std::string>;
+using Cache = std::unordered_map<std::pair<const char, const char>, std::string>;
 
 std::string processMoves(size_t depth, const std::vector<const scp::Grid*>& grids,
                          std::vector<Cache> caches, const std::string& line) {
@@ -87,23 +88,28 @@ std::string processMoves(size_t depth, const std::vector<const scp::Grid*>& grid
     if (grids.size() == depth) {
         return {line};
     }
-    if (caches[depth].contains(line)) {
-        return caches[depth][line];
-    }
     auto keypad = grids[depth];
-    scp::Coordinate start = keypad->search([](auto c) { return c == 'A'; }).value();
+    char startChar = 'A';
+    scp::Coordinate start = keypad->search([startChar](auto c) { return c == startChar; }).value();
     std::string result;
     MoveList moveBuffer;
     for (auto endChar : line) {
+        auto key = std::make_pair(startChar, endChar);
+        std::string nextLevel;
         const scp::Coordinate end =
             keypad->search([endChar](auto c) { return c == endChar; }).value();
-        moveBuffer.clear();
-        getMoves(*keypad, start, end, moveBuffer);
-        auto nextLevel = processMoves(depth + 1, grids, caches, toString(std::move(moveBuffer)));
+        if (depth > 0 && caches[depth].contains(key)) {
+            nextLevel = caches[depth][key];
+        } else {
+            moveBuffer.clear();
+            getMoves(*keypad, start, end, moveBuffer);
+            nextLevel = processMoves(depth + 1, grids, caches, toString(std::move(moveBuffer)));
+            caches[depth][key] = nextLevel;
+        }
         result += nextLevel;
         start = end;
+        startChar = endChar;
     }
-    // caches[depth][line] = result;
     return result;
 }
 
@@ -122,8 +128,9 @@ std::string part1Moves(const std::string& firstRobotLine) {
     std::cout << result << std::endl;
     return process(firstRobotLine, 2);
 }
+
 std::string part2Moves(const std::string& firstRobotLine) {
-    return process(firstRobotLine, 2);
+    return process(firstRobotLine, 11);
 }
 
 size_t getNumber(const std::string& line) {
