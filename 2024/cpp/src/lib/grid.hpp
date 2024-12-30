@@ -20,6 +20,12 @@ struct Direction {
     Direction operator*(const int magnitude) const {
         return {this->dx * magnitude, this->dy * magnitude};
     }
+    Direction unitize() const {
+        int dxp = this->dx > 0 ? 1 : (this->dx < 0 ? -1 : 0);
+        int dyp = this->dy > 0 ? 1 : (this->dy < 0 ? -1 : 0);
+        return {dxp, dyp};
+    }
+
     Direction opposite() const {
         return {this->dx * -1, this->dy * -1};
     }
@@ -41,6 +47,9 @@ template <typename T> struct GenCoordinate {
     }
     std::pair<int64_t, int64_t> displacement(const GenCoordinate& other) const {
         return {(int64_t)other.ix - (int64_t)this->ix, (int64_t)other.iy - (int64_t)this->iy};
+    }
+    scp::Direction vector(const GenCoordinate& other) const {
+        return {(int)other.ix - (int)this->ix, (int)other.iy - (int)this->iy};
     }
 };
 
