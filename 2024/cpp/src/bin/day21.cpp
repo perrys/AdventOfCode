@@ -35,46 +35,54 @@ const scp::Grid KEYPAD(std::vector<std::string>{" ^A", //
 
 using MoveList = std::vector<scp::Direction>;
 
-std::vector<MoveList> getReversedPaths(const scp::Grid& keypad, const scp::Coordinate start,
-                                       const scp::Coordinate end) {
-    std::vector<MoveList> result;
-    if (end == start) {
-        result.push_back(MoveList());
-        return result;
+void addNorthSouth(size_t displacement, int direction, MoveList& moves) {
+    if (0 == displacement)
+        return;
+    for (size_t i = 0; i != displacement; ++i) {
+        moves.push_back({0, direction});
     }
-    const auto vec = start.vector(end);
-    const auto unitVector = vec.unitize();
-    scp::Direction move = {unitVector.dx, 0};
-    if (move.dx != 0 && keypad.getWithOffsets(start, move).value() != ' ') {
-        for (auto path : getReversedPaths(keypad, start.move(move), end)) {
-            path.push_back(move);
-            result.push_back(std::move(path));
-        }
+}
+void addEastWest(size_t displacement, int direction, MoveList& moves) {
+    if (0 == displacement)
+        return;
+    for (size_t i = 0; i != displacement; ++i) {
+        moves.push_back({direction, 0});
     }
-    move = {0, unitVector.dy};
-    if (move.dy != 0 && keypad.getWithOffsets(start, move).value() != ' ') {
-        for (auto path : getReversedPaths(keypad, start.move(move), end)) {
-            path.push_back(move);
-            result.push_back(std::move(path));
-        }
-    }
-    return result;
 }
 
-std::string toString(MoveList&& reversedPath) {
-    std::ranges::reverse(reversedPath);
+void getMoves(const scp::Grid& grid, scp::Coordinate start, scp::Coordinate end, MoveList& moves) {
+    const auto vec = start.vector(end);
+    const auto unitVector = vec.unitize();
+    if (vec.dx > 0 && grid.getWithOffsets(start, {0, vec.dy}) != ' ') {
+        // heading west and vertically not into a gap
+        addNorthSouth(std::abs(vec.dy), unitVector.dy, moves);
+        addEastWest(std::abs(vec.dx), unitVector.dx, moves);
+        return;
+    }
+    if (grid.getWithOffsets(start, {vec.dx, 0}) != ' ') {
+        // horizontally not into a gap
+        addEastWest(std::abs(vec.dx), unitVector.dx, moves);
+        addNorthSouth(std::abs(vec.dy), unitVector.dy, moves);
+        return;
+    }
+    // can never start in the same column as a gap
+    addNorthSouth(std::abs(vec.dy), unitVector.dy, moves);
+    addEastWest(std::abs(vec.dx), unitVector.dx, moves);
+}
+
+std::string toString(MoveList&& path) {
     std::stringstream buffer;
-    for (auto m : reversedPath) {
+    for (auto m : path) {
         buffer << m;
     };
     buffer << 'A';
     return buffer.str();
 }
 
-using Cache = std::unordered_map<std::string, std::vector<std::string>>;
+using Cache = std::unordered_map<std::string, std::string>;
 
-std::vector<std::string> processMoves(size_t depth, const std::vector<const scp::Grid*>& grids,
-                                      std::vector<Cache> caches, const std::string& line) {
+std::string processMoves(size_t depth, const std::vector<const scp::Grid*>& grids,
+                         std::vector<Cache> caches, const std::string& line) {
 
     if (grids.size() == depth) {
         return {line};
@@ -84,29 +92,15 @@ std::vector<std::string> processMoves(size_t depth, const std::vector<const scp:
     }
     auto keypad = grids[depth];
     scp::Coordinate start = keypad->search([](auto c) { return c == 'A'; }).value();
-    std::vector<std::string> result;
+    std::string result;
+    MoveList moveBuffer;
     for (auto endChar : line) {
         const scp::Coordinate end =
             keypad->search([endChar](auto c) { return c == endChar; }).value();
-        auto paths = getReversedPaths(*keypad, start, end);
-        std::vector<std::string> possibles;
-        for (auto path : paths) {
-            for (auto resultLine :
-                 processMoves(depth + 1, grids, caches, toString(std::move(path)))) {
-                possibles.push_back(resultLine);
-            }
-        }
-        if (result.empty()) {
-            result = possibles;
-        } else {
-            std::vector<std::string> combined;
-            for (auto l1 : result) {
-                for (auto l2 : possibles) {
-                    combined.push_back(l1 + l2);
-                }
-            }
-            result = std::move(combined);
-        }
+        moveBuffer.clear();
+        getMoves(*keypad, start, end, moveBuffer);
+        auto nextLevel = processMoves(depth + 1, grids, caches, toString(std::move(moveBuffer)));
+        result += nextLevel;
         start = end;
     }
     // caches[depth][line] = result;
@@ -119,12 +113,7 @@ std::string process(const std::string& firstRobotLine, size_t depth) {
         grids.push_back(&KEYPAD);
     }
     std::vector<Cache> caches(grids.size());
-    std::string shortest;
-    for (auto line : processMoves(0, grids, caches, firstRobotLine)) {
-        if (shortest.empty() || line.size() < shortest.size()) {
-            shortest = line;
-        }
-    }
+    std::string shortest = processMoves(0, grids, caches, firstRobotLine);
     return shortest;
 }
 
