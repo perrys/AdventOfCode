@@ -20,18 +20,8 @@ const DIRS: [[i32; 2]; 8] = [
     [1, 1],
 ];
 
-fn part1(contents: &str) -> usize {
-    let grid: Vec<_> = contents
-        .lines()
-        .filter_map(|l| {
-            let line = l.trim();
-            if line.is_empty() {
-                return None;
-            }
-            Some(line.chars().collect::<Vec<_>>())
-        })
-        .collect();
-    let mut p1score = 0;
+fn part1(grid: &Vec<Vec<char>>) -> Vec<[usize; 2]> {
+    let mut result = Vec::new();
     for (y, row) in grid.iter().enumerate() {
         for (x, point) in row.iter().enumerate() {
             if *point != '@' {
@@ -45,15 +35,44 @@ fn part1(contents: &str) -> usize {
                 }
             }
             if count < 4 {
-                p1score += 1;
+                result.push([x, y]);
                 // print!("{}", 'x');
             } else {
                 // print!("{}", *point);
             }
         }
-        println!("");
+        // println!("");
     }
-    p1score
+    result
+}
+
+fn make_grid(contents: &str) -> Vec<Vec<char>> {
+    contents
+        .lines()
+        .filter_map(|l| {
+            let line = l.trim();
+            if line.is_empty() {
+                return None;
+            }
+            Some(line.chars().collect::<Vec<_>>())
+        })
+        .collect()
+}
+
+fn part2(grid: &mut Vec<Vec<char>>) -> usize {
+    let mut p2_score = 0;
+    loop {
+        let positions = part1(&grid);
+        let nremoved = positions.len();
+        if nremoved == 0 {
+            break;
+        }
+        p2_score += nremoved;
+        for [x, y] in positions {
+            grid[y][x] = '.';
+        }
+    }
+    p2_score
 }
 
 fn main() {
@@ -62,7 +81,9 @@ fn main() {
         panic!("USAGE: {} <input.dat>", argv[0]);
     }
     let contents = fs::read_to_string(&argv[1]).expect("invalid filename");
-    println!("part1: {}", part1(&contents));
+    let mut grid = make_grid(&contents);
+    println!("part1: {}", part1(&grid).len());
+    println!("part2: {}", part2(&mut grid));
 }
 
 #[cfg(test)]
@@ -84,6 +105,13 @@ mod tester {
 
     #[test]
     fn part1_test() {
-        assert_eq!(part1(TEST_DATA), 13);
+        let grid = make_grid(TEST_DATA);
+        assert_eq!(part1(&grid).len(), 13);
+    }
+
+    #[test]
+    fn part2_test() {
+        let mut grid = make_grid(TEST_DATA);
+        assert_eq!(part2(&mut grid), 43);
     }
 }
