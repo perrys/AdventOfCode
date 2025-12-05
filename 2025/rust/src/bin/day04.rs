@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-fn get(grid: &Vec<Vec<char>>, x: usize, y: usize, dx: i32, dy: i32) -> Option<char> {
+fn get(grid: &[Vec<char>], x: usize, y: usize, dx: i32, dy: i32) -> Option<char> {
     let xp = x as i32 + dx;
     let yp = y as i32 + dy;
     if xp < 0 || yp < 0 || xp as usize >= grid[0].len() || yp as usize >= grid.len() {
@@ -20,7 +20,7 @@ const DIRS: [[i32; 2]; 8] = [
     [1, 1],
 ];
 
-fn part1(grid: &Vec<Vec<char>>) -> Vec<[usize; 2]> {
+fn part1(grid: &[Vec<char>]) -> Vec<[usize; 2]> {
     let mut result = Vec::new();
     for (y, row) in grid.iter().enumerate() {
         for (x, point) in row.iter().enumerate() {
@@ -30,7 +30,7 @@ fn part1(grid: &Vec<Vec<char>>) -> Vec<[usize; 2]> {
             }
             let mut count = 0;
             for [dx, dy] in DIRS {
-                if get(&grid, x, y, dx, dy) == Some('@') {
+                if get(grid, x, y, dx, dy) == Some('@') {
                     count += 1;
                 }
             }
@@ -59,10 +59,10 @@ fn make_grid(contents: &str) -> Vec<Vec<char>> {
         .collect()
 }
 
-fn part2(grid: &mut Vec<Vec<char>>) -> usize {
+fn part2(grid: &mut [Vec<char>]) -> usize {
     let mut p2_score = 0;
     loop {
-        let positions = part1(&grid);
+        let positions = part1(grid);
         let nremoved = positions.len();
         if nremoved == 0 {
             break;

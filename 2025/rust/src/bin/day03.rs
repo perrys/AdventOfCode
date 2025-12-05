@@ -27,10 +27,10 @@ fn largest_pair(line_str: &str) -> u64 {
             first = Some(next);
             continue;
         }
-        if let Some(cur) = second {
-            if next < cur {
-                continue;
-            }
+        if let Some(cur) = second
+            && next < cur
+        {
+            continue;
         }
         second = Some(next);
     }
@@ -45,10 +45,10 @@ fn largest(line: &[char], ndigits: usize, result: &mut Vec<char>) {
     let usable_len = line.len() - ndigits + 1;
     let mut idx = None;
     for i in 0..usable_len {
-        if let Some(max_idx) = idx {
-            if line[i] <= line[max_idx] {
-                continue;
-            }
+        if let Some(max_idx) = idx
+            && line[i] <= line[max_idx]
+        {
+            continue;
         }
         idx = Some(i);
     }
@@ -71,7 +71,7 @@ fn main() {
         panic!("USAGE: {} <input.dat>", argv[0]);
     }
     let contents = fs::read_to_string(&argv[1]).expect("unable to read file");
-    let lines: Vec<_> = contents.split("\n").filter(|l| l.len() > 0).collect();
+    let lines: Vec<_> = contents.split("\n").filter(|l| !l.is_empty()).collect();
     let p1: u64 = lines.clone().into_iter().map(largest_pair).sum();
     println!("part1: {}", p1);
     let p2: u64 = lines.into_iter().map(largest_12).sum();
