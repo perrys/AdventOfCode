@@ -59,10 +59,10 @@ type Cache = HashMap<Point, usize>;
 fn part2(contents: &str) -> usize {
     let mut grid = make_grid(contents);
     let mut cache = Cache::new();
-    count_paths(&mut grid, &mut cache, 1)
+    count_paths_recursive(&mut grid, &mut cache, 1)
 }
 
-fn count_paths(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: usize) -> usize {
+fn count_paths_recursive(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: usize) -> usize {
     if row_idx == grid.len() {
         return 1;
     }
@@ -76,7 +76,7 @@ fn count_paths(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: usize) -> 
         };
         match grid[row_idx][col_idx] {
             '.' if incoming_beam => {
-                // the splitter rows are is interspersed with blank rows,
+                // the splitter rows are interspersed with blank rows,
                 // so we can just memoize the straight beam locations:
                 let key = (row_idx, col_idx);
                 if let Some(entry) = cache.get(&key) {
@@ -84,7 +84,7 @@ fn count_paths(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: usize) -> 
                 } else {
                     let copy = grid[row_idx][col_idx];
                     grid[row_idx][col_idx] = '|';
-                    paths_below += count_paths(grid, cache, row_idx + 1);
+                    paths_below += count_paths_recursive(grid, cache, row_idx + 1);
                     grid[row_idx][col_idx] = copy;
                     cache.insert(key, paths_below);
                 }
@@ -94,14 +94,14 @@ fn count_paths(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: usize) -> 
                     let idx = col_idx - 1;
                     let copy = grid[row_idx][idx];
                     grid[row_idx][idx] = '|';
-                    paths_below += count_paths(grid, cache, row_idx + 1);
+                    paths_below += count_paths_recursive(grid, cache, row_idx + 1);
                     grid[row_idx][idx] = copy;
                 }
                 if col_idx < ncols - 1 {
                     let idx = col_idx + 1;
                     let copy = grid[row_idx][idx];
                     grid[row_idx][idx] = '|';
-                    paths_below += count_paths(grid, cache, row_idx + 1);
+                    paths_below += count_paths_recursive(grid, cache, row_idx + 1);
                     grid[row_idx][idx] = copy;
                 }
             }
