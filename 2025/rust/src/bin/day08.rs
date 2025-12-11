@@ -7,6 +7,7 @@ fn main() {
     }
     let contents = std::fs::read_to_string(&argv[1]).expect("invalid filename");
     println!("part1: {}", part1(&contents));
+    println!("part2: {}", part2(&contents));
 }
 
 type Point = (i64, i64, i64);
@@ -56,7 +57,7 @@ fn parse(contents: &str) -> Vec<Point> {
         .collect::<Vec<_>>()
 }
 
-fn part1(contents: &str) -> usize {
+fn get_distances(contents: &str) -> Vec<PointPair> {
     let points = parse(contents);
     let n = points.len();
     let mut distances = Vec::with_capacity(n / 2 * (n + 1));
@@ -73,13 +74,34 @@ fn part1(contents: &str) -> usize {
     // for d in distances.iter() {
     //     println!("{d:?}");
     // }
+    distances
+}
 
+fn part2(contents: &str) -> usize {
+    let distances = get_distances(contents);
+    let _groups = get_groups(distances, None);
+    0
+}
+fn part1(contents: &str) -> usize {
+    let distances = get_distances(contents);
+    let groups = get_groups(distances, Some(1000));
+    let mut sizes: Vec<usize> = groups.into_iter().map(|group| group.len()).collect();
+    sizes.sort();
+    // println!("{sizes:?}");
+    sizes
+        .into_iter()
+        .rev()
+        .take(3)
+        .fold(1, |lhs, rhs| lhs * rhs)
+}
+
+fn get_groups(distances: Vec<PointPair>, sample_size: Option<usize>) -> Vec<HashSet<Point>> {
     let mut groups = Vec::<HashSet<Point>>::new();
-    let sample_size = 1000;
+    let samples = sample_size.unwrap_or(distances.len());
     for PointPair {
         distance: _,
         points,
-    } in distances.iter().take(sample_size)
+    } in distances.iter().take(samples)
     {
         let mut group_idxs = (None, None);
         for i in 0..groups.len() {
@@ -106,14 +128,12 @@ fn part1(contents: &str) -> usize {
         } else {
             groups.push(HashSet::from([points.0, points.1]));
         }
+        if groups.len() == 1 && groups[0].len() == 1000 {
+            println!("part2: {points:?}");
+            println!("part2: {}", points.0.0 * points.1.0);
+            break;
+        }
     }
     // println!("groups: {groups:?}");
-    let mut sizes: Vec<usize> = groups.into_iter().map(|group| group.len()).collect();
-    sizes.sort();
-    // println!("{sizes:?}");
-    sizes
-        .into_iter()
-        .rev()
-        .take(3)
-        .fold(1, |lhs, rhs| lhs * rhs)
+    groups
 }
