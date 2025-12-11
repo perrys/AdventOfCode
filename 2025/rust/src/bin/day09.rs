@@ -21,7 +21,7 @@ fn parse_line(line: &str) -> Pair {
             .parse::<usize>()
             .expect("non-int 2"),
     );
-    assert!(iter.next() == None);
+    assert!(iter.next().is_none());
     result
 }
 

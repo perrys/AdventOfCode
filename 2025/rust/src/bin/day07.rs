@@ -25,10 +25,7 @@ fn part1(contents: &str) -> usize {
     let mut count = 0;
     for row_idx in 1..grid.len() {
         for col_idx in 0..ncols {
-            let has_parent = match grid[row_idx - 1][col_idx] {
-                '|' | 'S' => true,
-                _ => false,
-            };
+            let has_parent = matches!(grid[row_idx - 1][col_idx], '|' | 'S');
             match grid[row_idx][col_idx] {
                 '.' if has_parent => grid[row_idx][col_idx] = '|',
                 '^' if has_parent => {
@@ -70,10 +67,7 @@ fn count_paths_recursive(grid: &mut Vec<Vec<char>>, cache: &mut Cache, row_idx: 
     let ncols = grid[0].len();
     for col_idx in 0..ncols {
         let mut paths_below = 0;
-        let incoming_beam = match grid[row_idx - 1][col_idx] {
-            '|' | 'S' => true,
-            _ => false,
-        };
+        let incoming_beam = matches!(grid[row_idx - 1][col_idx], '|' | 'S');
         match grid[row_idx][col_idx] {
             '.' if incoming_beam => {
                 // the splitter rows are interspersed with blank rows,
