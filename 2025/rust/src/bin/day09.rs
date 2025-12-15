@@ -5,6 +5,7 @@ fn main() {
     }
     let contents = std::fs::read_to_string(&argv[1]).expect("invalid filename");
     println!("part1: {}", part1(&contents));
+    println!("part2: {}", part2(&contents));
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -13,7 +14,12 @@ struct CoOrd {
     y: usize,
 }
 
-#[derive(Copy, Clone, Debug)]
+trait Intersector {
+    fn intersects(&self, val: usize) -> bool;
+    fn sort_key(&self) -> usize;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct HorizontalLine {
     y: usize,
     // usable tiles are on the right in direction of travel
@@ -21,9 +27,12 @@ struct HorizontalLine {
     x1: usize,
 }
 
-impl HorizontalLine {
+impl Intersector for HorizontalLine {
     fn intersects(&self, x: usize) -> bool {
         self.x0.min(self.x1) <= x && self.x1.max(self.x0) >= x
+    }
+    fn sort_key(&self) -> usize {
+        self.y
     }
 }
 
@@ -35,10 +44,41 @@ struct VerticalLine {
     y1: usize,
 }
 
-impl VerticalLine {
+impl Intersector for VerticalLine {
     fn intersects(&self, y: usize) -> bool {
         self.y0.min(self.y1) <= y && self.y1.max(self.y0) >= y
     }
+    fn sort_key(&self) -> usize {
+        self.x
+    }
+}
+
+fn ray_cast<T>(
+    lines: &[T],
+    start_key: usize,
+    target: usize,
+    forwards: bool,
+) -> Result<T, &'static str>
+where
+    T: Intersector + Clone,
+{
+    let start = lines
+        .binary_search_by_key(&start_key, T::sort_key)
+        .expect("start line not in lines");
+    if forwards {
+        for line in lines[start + 1..].iter() {
+            if line.intersects(target) {
+                return Ok(line.clone());
+            }
+        }
+    } else {
+        for line in lines[0..start].iter().rev() {
+            if line.intersects(target) {
+                return Ok(line.clone());
+            }
+        }
+    }
+    Err("ray cast failed to hit anything")
 }
 
 fn parse_input_line(line: &str) -> CoOrd {
@@ -72,7 +112,7 @@ fn part1(contents: &str) -> usize {
     max
 }
 
-fn part2(contents: &str) {
+fn part2(contents: &str) -> usize {
     let points = contents.lines().map(parse_input_line).collect::<Vec<_>>();
     let npoints = points.len();
 
@@ -95,37 +135,47 @@ fn part2(contents: &str) {
             });
         }
     }
-    v_lines.sort_by_key(|line| line.x);
-    h_lines.sort_by_key(|line| line.y);
+    v_lines.sort_by_key(VerticalLine::sort_key);
+    h_lines.sort_by_key(HorizontalLine::sort_key);
 
     let mut next_is_vert = points[0].x == points[1].x;
-    // ray casting
     for i in 0..npoints {
         let current = points[i];
         let prev = points[(i + 1) % npoints];
         let next = points[(i + npoints - 1) % npoints];
         if next_is_vert {
-            let mut first_intersecting: Option<HorizontalLine> = None;
-            let start_row = h_lines
-                .binary_search_by_key(&current.y, |line| line.y)
-                .expect("hline missing");
-            let mut i = start_row;
-            loop {
-                if h_lines[i].intersects(current.x) {
-                    first_intersecting = Some(h_lines[i]);
-                    break;
-                }
+            let northward = next.y > current.y;
+            let eastward = prev.x > current.x;
+            let h1 = ray_cast(&h_lines, next.y, current.x, northward).unwrap();
+            let v1 = ray_cast(&v_lines, prev.x, current.y, eastward).unwrap();
 
-                if next.y > current.y {
-                    i += 1;
-                } else {
-                    i -= 1;
-                };
-                if i == 0 || i + 1 == h_lines.len() {
-                    break;
-                }
-            }
+            let h2 = ray_cast(&h_lines, current.y, v1.x, northward).unwrap();
+            let v2 = ray_cast(&v_lines, current.x, h1.y, eastward).unwrap();
         }
         next_is_vert = !next_is_vert;
+    }
+    0
+}
+
+#[cfg(test)]
+mod tester {
+    use super::*;
+
+    #[test]
+    fn test_ray_cast() {
+        let hlines = vec![
+            HorizontalLine { y: 1, x0: 2, x1: 6 },
+            HorizontalLine { y: 2, x0: 7, x1: 9 },
+            HorizontalLine { y: 3, x0: 3, x1: 5 },
+            HorizontalLine { y: 4, x0: 6, x1: 7 },
+        ];
+        assert_eq!(ray_cast(&hlines, 1, 8, true), Ok(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 1, 3, true), Ok(hlines[2].clone()));
+        assert!(ray_cast(&hlines, 1, 1, true).is_err());
+
+        assert_eq!(ray_cast(&hlines, 4, 7, false), Ok(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 3, 8, false), Ok(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 2, 5, false), Ok(hlines[0].clone()));
+        assert!(ray_cast(&hlines, 1, 5, false).is_err());
     }
 }
