@@ -81,6 +81,42 @@ where
     Err("ray cast failed to hit anything")
 }
 
+fn connected(h_lines: &[HorizontalLine], v_lines: &[VerticalLine], p1: &CoOrd, p2: &CoOrd) -> bool {
+    if p1.y == p2.y || p1.x == p2.x {
+        return false; // just ignore these, unlikely to be the max area
+    }
+    let (lhs, rhs) = if p2.x > p1.x { (p1, p2) } else { (p2, p1) };
+    let northward = rhs.y > lhs.y;
+    let target1 = CoOrd { x: lhs.x, y: rhs.y };
+    let target2 = CoOrd { x: rhs.x, y: lhs.y };
+
+    // first point vertical ray cast:
+    let h1 = ray_cast(h_lines, lhs.y, lhs.x, northward).expect("ray cast within area");
+    if (northward && h1.y < target2.y) || (!northward && h1.y > target1.y) {
+        return false;
+    }
+
+    // first point horizontal ray cast:
+    let v1 = ray_cast(v_lines, lhs.x, lhs.y, true).expect("ray cast within area");
+    if v1.x < target2.x {
+        return false;
+    };
+
+    // second point vertical:
+    let h2 = ray_cast(h_lines, rhs.y, rhs.x, !northward).expect("ray cast within area");
+    if (!northward && h2.y > target1.y) || (northward && h2.y < target1.y) {
+        return false;
+    }
+
+    // second point horizontal:
+    let v2 = ray_cast(v_lines, rhs.x, rhs.y, false).expect("ray cast within area");
+    if v2.x > target1.x {
+        return false;
+    }
+
+    true
+}
+
 fn parse_input_line(line: &str) -> CoOrd {
     let mut iter = line.split(',');
     let x = iter
@@ -113,7 +149,11 @@ fn part1(contents: &str) -> usize {
 }
 
 fn part2(contents: &str) -> usize {
-    let points = contents.lines().map(parse_input_line).collect::<Vec<_>>();
+    let points = contents
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(parse_input_line)
+        .collect::<Vec<_>>();
     let npoints = points.len();
 
     let mut h_lines = Vec::new();
@@ -138,23 +178,15 @@ fn part2(contents: &str) -> usize {
     v_lines.sort_by_key(VerticalLine::sort_key);
     h_lines.sort_by_key(HorizontalLine::sort_key);
 
-    let mut next_is_vert = points[0].x == points[1].x;
-    for i in 0..npoints {
-        let current = points[i];
-        let prev = points[(i + 1) % npoints];
-        let next = points[(i + npoints - 1) % npoints];
-        if next_is_vert {
-            let northward = next.y > current.y;
-            let eastward = prev.x > current.x;
-            let h1 = ray_cast(&h_lines, next.y, current.x, northward).unwrap();
-            let v1 = ray_cast(&v_lines, prev.x, current.y, eastward).unwrap();
-
-            let h2 = ray_cast(&h_lines, current.y, v1.x, northward).unwrap();
-            let v2 = ray_cast(&v_lines, current.x, h1.y, eastward).unwrap();
+    let mut max = 0;
+    for i in 0..points.len() {
+        for j in (i + 1)..points.len() {
+            if connected(&h_lines, &v_lines, &points[i], &points[j]) {
+                max = max.max(area(&points[i], &points[j]));
+            }
         }
-        next_is_vert = !next_is_vert;
     }
-    0
+    max
 }
 
 #[cfg(test)]
@@ -177,5 +209,21 @@ mod tester {
         assert_eq!(ray_cast(&hlines, 3, 8, false), Ok(hlines[1].clone()));
         assert_eq!(ray_cast(&hlines, 2, 5, false), Ok(hlines[0].clone()));
         assert!(ray_cast(&hlines, 1, 5, false).is_err());
+    }
+
+    const TEST_DATA: &str = r#"
+7,1
+11,1
+11,7
+9,7
+9,5
+2,5
+2,3
+7,3
+    "#;
+    #[test]
+    fn test_part2() {
+        let ans = part2(TEST_DATA);
+        assert_eq!(ans, 24);
     }
 }
