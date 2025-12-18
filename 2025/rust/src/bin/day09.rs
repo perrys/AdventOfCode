@@ -8,14 +8,20 @@ fn main() {
     println!("part2: {}", part2(&contents));
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct CoOrd {
     x: usize,
     y: usize,
 }
 
+enum Intersection {
+    None,
+    Edge,
+    Middle,
+}
+
 trait Intersector {
-    fn intersects(&self, val: usize) -> bool;
+    fn intersects(&self, val: usize) -> Intersection;
     fn sort_key(&self) -> usize;
 }
 
@@ -28,8 +34,14 @@ struct HorizontalLine {
 }
 
 impl Intersector for HorizontalLine {
-    fn intersects(&self, x: usize) -> bool {
-        self.x0.min(self.x1) <= x && self.x1.max(self.x0) >= x
+    fn intersects(&self, x: usize) -> Intersection {
+        if self.x0.min(self.x1) < x && self.x1.max(self.x0) > x {
+            Intersection::Middle
+        } else if x == self.x0 || x == self.x1 {
+            Intersection::Edge
+        } else {
+            Intersection::None
+        }
     }
     fn sort_key(&self) -> usize {
         self.y
@@ -45,40 +57,49 @@ struct VerticalLine {
 }
 
 impl Intersector for VerticalLine {
-    fn intersects(&self, y: usize) -> bool {
-        self.y0.min(self.y1) <= y && self.y1.max(self.y0) >= y
+    fn intersects(&self, y: usize) -> Intersection {
+        if self.y0.min(self.y1) < y && self.y1.max(self.y0) > y {
+            Intersection::Middle
+        } else if y == self.y0 || y == self.y1 {
+            Intersection::Edge
+        } else {
+            Intersection::None
+        }
     }
     fn sort_key(&self) -> usize {
         self.x
     }
 }
 
-fn ray_cast<T>(
-    lines: &[T],
-    start_key: usize,
-    target: usize,
-    forwards: bool,
-) -> Result<T, &'static str>
+/**
+ * Find the _furthest_ intersecting line
+ */
+fn ray_cast<T>(lines: &[T], start_key: usize, target: usize, forwards: bool) -> Option<T>
 where
     T: Intersector + Clone,
 {
     let start = lines
         .binary_search_by_key(&start_key, T::sort_key)
         .expect("start line not in lines");
+    let mut direct: Option<T> = None;
     if forwards {
         for line in lines[start + 1..].iter() {
-            if line.intersects(target) {
-                return Ok(line.clone());
+            match line.intersects(target) {
+                Intersection::Edge => direct = Some(line.clone()),
+                Intersection::Middle => return Some(line.clone()),
+                Intersection::None => continue,
             }
         }
     } else {
         for line in lines[0..start].iter().rev() {
-            if line.intersects(target) {
-                return Ok(line.clone());
+            match line.intersects(target) {
+                Intersection::Edge => direct = Some(line.clone()),
+                Intersection::Middle => return Some(line.clone()),
+                Intersection::None => continue,
             }
         }
     }
-    Err("ray cast failed to hit anything")
+    direct
 }
 
 fn connected(h_lines: &[HorizontalLine], v_lines: &[VerticalLine], p1: &CoOrd, p2: &CoOrd) -> bool {
@@ -86,32 +107,41 @@ fn connected(h_lines: &[HorizontalLine], v_lines: &[VerticalLine], p1: &CoOrd, p
         return false; // just ignore these, unlikely to be the max area
     }
     let (lhs, rhs) = if p2.x > p1.x { (p1, p2) } else { (p2, p1) };
-    let northward = rhs.y > lhs.y;
-    let target1 = CoOrd { x: lhs.x, y: rhs.y };
-    let target2 = CoOrd { x: rhs.x, y: lhs.y };
+    let mut forwards = rhs.y > lhs.y;
+    // let target1 = CoOrd { x: lhs.x, y: rhs.y };
+    // let target2 = CoOrd { x: rhs.x, y: lhs.y };
 
     // first point vertical ray cast:
-    let h1 = ray_cast(h_lines, lhs.y, lhs.x, northward).expect("ray cast within area");
-    if (northward && h1.y < target2.y) || (!northward && h1.y > target1.y) {
-        return false;
+    match ray_cast(h_lines, lhs.y, lhs.x, forwards) {
+        Some(h_line) if (forwards && h_line.y < rhs.y) || (!forwards && h_line.y > rhs.y) => {
+            return false;
+        }
+        None => return false,
+        _ => (),
     }
 
     // first point horizontal ray cast:
-    let v1 = ray_cast(v_lines, lhs.x, lhs.y, true).expect("ray cast within area");
-    if v1.x < target2.x {
-        return false;
-    };
+    match ray_cast(v_lines, lhs.x, lhs.y, true) {
+        Some(v_line) if v_line.x < rhs.x => return false,
+        None => return false,
+        _ => (),
+    }
 
+    forwards = !forwards;
     // second point vertical:
-    let h2 = ray_cast(h_lines, rhs.y, rhs.x, !northward).expect("ray cast within area");
-    if (!northward && h2.y > target1.y) || (northward && h2.y < target1.y) {
-        return false;
+    match ray_cast(h_lines, rhs.y, rhs.x, forwards) {
+        Some(h_line) if (forwards && h_line.y < rhs.y) || (!forwards && h_line.y > rhs.y) => {
+            return false;
+        }
+        None => return false,
+        _ => (),
     }
 
     // second point horizontal:
-    let v2 = ray_cast(v_lines, rhs.x, rhs.y, false).expect("ray cast within area");
-    if v2.x > target1.x {
-        return false;
+    match ray_cast(v_lines, rhs.x, rhs.y, false) {
+        Some(v_line) if v_line.x > rhs.x => return false,
+        None => return false,
+        _ => (),
     }
 
     true
@@ -158,8 +188,12 @@ fn part2(contents: &str) -> usize {
 
     let mut h_lines = Vec::new();
     let mut v_lines = Vec::new();
-    for i in 1..npoints {
-        let p0 = points[i - 1];
+    for i in 0..npoints {
+        let p0 = if i == 0 {
+            points[npoints - 1]
+        } else {
+            points[i - 1]
+        };
         let p1 = points[i];
         if p0.x == p1.x {
             v_lines.push(VerticalLine {
@@ -175,14 +209,24 @@ fn part2(contents: &str) -> usize {
             });
         }
     }
+
     v_lines.sort_by_key(VerticalLine::sort_key);
     h_lines.sort_by_key(HorizontalLine::sort_key);
 
     let mut max = 0;
     for i in 0..points.len() {
         for j in (i + 1)..points.len() {
-            if connected(&h_lines, &v_lines, &points[i], &points[j]) {
-                max = max.max(area(&points[i], &points[j]));
+            let p1 = &points[i];
+            let p2 = &points[j];
+            if *p1 == (CoOrd { x: 9, y: 5 }) && *p2 == (CoOrd { x: 2, y: 3 }) {
+                println!("should be max");
+            }
+            if connected(&h_lines, &v_lines, p1, p2) {
+                let area = area(p1, p2);
+                // println!("[{p1:?} {p2:?}] connected area = {area}");
+                max = max.max(area);
+            // } else {
+            //     println!("[{p1:?} {p2:?}] not connected");
             }
         }
     }
@@ -201,14 +245,14 @@ mod tester {
             HorizontalLine { y: 3, x0: 3, x1: 5 },
             HorizontalLine { y: 4, x0: 6, x1: 7 },
         ];
-        assert_eq!(ray_cast(&hlines, 1, 8, true), Ok(hlines[1].clone()));
-        assert_eq!(ray_cast(&hlines, 1, 3, true), Ok(hlines[2].clone()));
-        assert!(ray_cast(&hlines, 1, 1, true).is_err());
+        assert_eq!(ray_cast(&hlines, 1, 8, true), Some(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 1, 3, true), Some(hlines[2].clone()));
+        assert!(ray_cast(&hlines, 1, 1, true).is_none());
 
-        assert_eq!(ray_cast(&hlines, 4, 7, false), Ok(hlines[1].clone()));
-        assert_eq!(ray_cast(&hlines, 3, 8, false), Ok(hlines[1].clone()));
-        assert_eq!(ray_cast(&hlines, 2, 5, false), Ok(hlines[0].clone()));
-        assert!(ray_cast(&hlines, 1, 5, false).is_err());
+        assert_eq!(ray_cast(&hlines, 4, 7, false), Some(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 3, 8, false), Some(hlines[1].clone()));
+        assert_eq!(ray_cast(&hlines, 2, 5, false), Some(hlines[0].clone()));
+        assert!(ray_cast(&hlines, 1, 5, false).is_none());
     }
 
     const TEST_DATA: &str = r#"
