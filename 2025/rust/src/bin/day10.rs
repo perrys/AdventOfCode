@@ -4,7 +4,12 @@ fn main() {
         panic!("USAGE: {} <input.dat>", argv[0]);
     }
     let contents = std::fs::read_to_string(&argv[1]).expect("invalid filename");
-    // println!("part1: {}", part1(&contents));
+    println!("part1: {}", part1(&contents));
+}
+
+fn part1(contents: &str) -> usize {
+    let machines = Machine::parse_lines(contents);
+    machines.iter().map(bfs).sum()
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +24,7 @@ impl Machine {
         let mut lights = 0;
         let mut buttons = Vec::new();
         let mut joltages = Vec::new();
+        let mut nbits = 0;
         let tokens = line.split(' ').map(|s| s.trim()).filter(|s| !s.is_empty());
         for token in tokens {
             let mut chars = token.chars();
@@ -26,9 +32,13 @@ impl Machine {
                 Some('[') => {
                     for c in chars {
                         match c {
-                            '.' => lights = lights << 1,
+                            '.' => {
+                                nbits += 1;
+                                lights <<= 1
+                            }
                             '#' => {
-                                lights = lights << 1;
+                                nbits += 1;
+                                lights <<= 1;
                                 lights |= 1;
                             }
                             _ => (),
@@ -38,7 +48,8 @@ impl Machine {
                 Some('(') => {
                     let mut button = 0;
                     token[1..token.len() - 1].split(',').for_each(|s| {
-                        let n = s.parse::<u16>().expect("non-integer");
+                        // read backwards:
+                        let n = nbits - s.parse::<u16>().expect("non-integer") - 1;
                         let bits = 1 << n;
                         button |= bits;
                     });
@@ -72,6 +83,42 @@ impl Machine {
     }
 }
 
+#[allow(dead_code)]
+fn print_presses(presses: &[u16]) {
+    println!("solution found!");
+    for p in presses.iter() {
+        println!("{p} - {p:b}")
+    }
+}
+
+fn bfs(machine: &Machine) -> usize {
+    let start = machine.buttons.iter().map(|b| vec![*b]);
+    let mut queue = std::collections::VecDeque::from_iter(start);
+    let depth_limit = 10;
+    while !queue.is_empty() {
+        let presses = queue.pop_front().unwrap();
+        if presses.len() > depth_limit {
+            panic!("reached depth limit");
+        }
+        let mut lights = machine.lights;
+        for p in presses.iter() {
+            lights ^= p
+        }
+        if lights == 0 {
+            // print_presses(&presses);
+            return presses.len();
+        }
+        for p in machine.buttons.iter() {
+            if !presses.contains(p) {
+                let mut next = presses.clone();
+                next.push(*p);
+                queue.push_back(next);
+            }
+        }
+    }
+    panic!("no solution found");
+}
+
 #[cfg(test)]
 mod tester {
     use super::*;
@@ -89,7 +136,7 @@ mod tester {
         assert_eq!(
             Machine {
                 lights: 6,
-                buttons: vec![8, 2 + 8, 4, 4 + 8, 1 + 4, 1 + 2],
+                buttons: vec![1, 4 + 1, 2, 2 + 1, 8 + 2, 8 + 4],
                 joltages: vec![3, 5, 4, 7]
             },
             machines[0]
@@ -97,10 +144,36 @@ mod tester {
         assert_eq!(
             Machine {
                 lights: 2,
-                buttons: vec![1 + 4 + 8 + 16, 4 + 8, 1 + 16, 1 + 2 + 4, 2 + 4 + 8 + 16],
+                buttons: vec![16 + 4 + 2 + 1, 4 + 2, 1 + 16, 16 + 8 + 4, 8 + 4 + 2 + 1],
                 joltages: vec![7, 5, 12, 7, 2]
             },
             machines[1]
         );
+    }
+
+    #[test]
+    fn test_ordering() {
+        let machines = Machine::parse_lines(TEST_DATA);
+        let test = &machines[1];
+        for (i, button) in test.buttons.iter().enumerate() {
+            println!("button_{i}: {button:05b}");
+        }
+        let mut lights = test.lights;
+        println!("{lights:05b}");
+        lights ^= test.buttons[2];
+        println!("{lights:05b}");
+        lights ^= test.buttons[3];
+        println!("{lights:05b}");
+        lights ^= test.buttons[4];
+        println!("{lights:05b}");
+        assert_eq!(0, lights);
+    }
+
+    #[test]
+    fn test_bfs() {
+        let machines = Machine::parse_lines(TEST_DATA);
+        assert_eq!(bfs(&machines[0]), 2);
+        assert_eq!(bfs(&machines[1]), 3);
+        assert_eq!(bfs(&machines[2]), 2);
     }
 }
