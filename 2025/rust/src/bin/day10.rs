@@ -119,6 +119,36 @@ fn bfs(machine: &Machine) -> usize {
     panic!("no solution found");
 }
 
+fn gauss_elim_unit(rows: &mut [Vec<i32>]) {
+    let nrows = rows.len();
+    let ncols = rows[0].len();
+    let mut p_idx = 0;
+    for col_idx in 0..ncols {
+        if let Some(pivot_row) = (p_idx..nrows).find(|&row_idx| rows[row_idx][col_idx] != 0) {
+            if pivot_row != p_idx {
+                rows.swap(p_idx, pivot_row);
+            }
+            for i in (p_idx + 1)..nrows {
+                if rows[i][col_idx] == 0 {
+                    continue;
+                }
+                let factor = rows[i][col_idx] / rows[p_idx][col_idx]; // 1 or -1
+                for j in 0..ncols {
+                    rows[i][j] -= factor * rows[p_idx][j];
+                }
+            }
+            p_idx += 1;
+        }
+        println!("col_idx={col_idx}, p_idx={p_idx}");
+        for row in rows.iter() {
+            for c in row.iter() {
+                print!("{c:4} ");
+            }
+            println!("");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tester {
     use super::*;
@@ -175,5 +205,25 @@ mod tester {
         assert_eq!(bfs(&machines[0]), 2);
         assert_eq!(bfs(&machines[1]), 3);
         assert_eq!(bfs(&machines[2]), 2);
+    }
+
+    #[test]
+    fn test_gauss_elim_unit() {
+        let mut rows = vec![
+            vec![1, 0, 1, 1, 0, 7],
+            vec![0, 0, 0, 1, 1, 5],
+            vec![1, 1, 0, 1, 1, 12],
+            vec![1, 1, 0, 0, 1, 7],
+            vec![1, 0, 1, 0, 1, 2],
+        ];
+        gauss_elim_unit(&mut rows);
+        let expected = vec![
+            vec![1, 0, 1, 1, 0, 7],
+            vec![0, 1, -1, 0, 1, 5],
+            vec![0, 0, 0, 1, 1, 5],
+            vec![0, 0, 0, 0, 1, 0],
+            vec![0, 0, 0, 0, 0, 0],
+        ];
+        assert_eq!(expected, rows);
     }
 }
