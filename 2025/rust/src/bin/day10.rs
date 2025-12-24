@@ -81,6 +81,24 @@ impl Machine {
             .map(Self::parse_line)
             .collect()
     }
+
+    fn to_similtaneous_eqns(&self) -> Vec<Vec<i32>> {
+        let nrows = self.joltages.len();
+        let ncols = self.buttons.len() + 1;
+        let mut rows = Vec::with_capacity(nrows);
+        for i in 0..nrows {
+            rows.push(vec![0; ncols]);
+            rows[i][ncols - 1] = self.joltages[i] as i32;
+        }
+        for (j, button) in self.buttons.iter().enumerate() {
+            for i in 0..nrows {
+                let shifted = button >> i;
+                let i_prime = nrows - i - 1; // bits are reversed
+                rows[i_prime][j] = (shifted & 1) as i32;
+            }
+        }
+        rows
+    }
 }
 
 #[allow(dead_code)]
@@ -119,6 +137,16 @@ fn bfs(machine: &Machine) -> usize {
     panic!("no solution found");
 }
 
+#[allow(dead_code)]
+fn print_matrix(rows: &[Vec<i32>]) {
+    for row in rows.iter() {
+        for c in row.iter() {
+            print!("{c:4} ");
+        }
+        println!("");
+    }
+}
+
 fn gauss_elim_unit(rows: &mut [Vec<i32>]) {
     let nrows = rows.len();
     let ncols = rows[0].len();
@@ -139,14 +167,38 @@ fn gauss_elim_unit(rows: &mut [Vec<i32>]) {
             }
             p_idx += 1;
         }
-        println!("col_idx={col_idx}, p_idx={p_idx}");
-        for row in rows.iter() {
-            for c in row.iter() {
-                print!("{c:4} ");
-            }
-            println!("");
-        }
+        // println!("col_idx={col_idx}, p_idx={p_idx}");
     }
+}
+
+fn isZero(row: &[i32]) -> bool {
+    row.iter().all(|&v| v == 0)
+}
+/**
+ * Solve by simple back-substitution
+ */
+fn solve(m: &[Vec<i32>]) -> Vec<i32> {
+    let nrows = m.len();
+    let ncols = m[0].len();
+    let last = ncols - 2;
+    let mut pivot = last;
+    let mut x = vec![0; ncols - 1];
+
+    for (i, row) in m.iter().enumerate().rev() {
+        if isZero(row) {
+            continue;
+        }
+        while row[pivot] == 0 {
+            pivot -= 1;
+        }
+        let mut val = row[ncols - 1];
+        for j in pivot + 1..=last {
+            val -= row[j] * x[j];
+        }
+        val /= row[pivot]; // 1 or -1
+        x[pivot] = val;
+    }
+    x
 }
 
 #[cfg(test)]
@@ -208,22 +260,82 @@ mod tester {
     }
 
     #[test]
-    fn test_gauss_elim_unit() {
-        let mut rows = vec![
+    fn test_bit_decoder() {
+        let machines = Machine::parse_lines(TEST_DATA);
+        // [...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
+        let expected = vec![
             vec![1, 0, 1, 1, 0, 7],
             vec![0, 0, 0, 1, 1, 5],
             vec![1, 1, 0, 1, 1, 12],
             vec![1, 1, 0, 0, 1, 7],
             vec![1, 0, 1, 0, 1, 2],
         ];
+        assert_eq!(machines[1].to_similtaneous_eqns(), expected);
+    }
+
+    #[test]
+    fn test_gauss_elim_unit() {
+        let machines = Machine::parse_lines(TEST_DATA);
+        let mut rows = machines[0].to_similtaneous_eqns();
+        print_matrix(&rows);
         gauss_elim_unit(&mut rows);
-        let expected = vec![
-            vec![1, 0, 1, 1, 0, 7],
-            vec![0, 1, -1, 0, 1, 5],
-            vec![0, 0, 0, 1, 1, 5],
-            vec![0, 0, 0, 0, 1, 0],
+        //       x1  x2    x3  x4    x5    x6
+        //[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
+        let mut expected = vec![
+            vec![1, 1, 0, 1, 0, 0, 7], // x1 + x2 + x4 = 7
+            vec![0, 1, 0, 0, 0, 1, 5], // x2 + x6 = 5
+            vec![0, 0, 1, 1, 1, 0, 4], // x3 + x4 + x5 = 4
+            vec![0, 0, 0, 0, 1, 1, 3], // x5 + x6 = 3
+        ];
+        // x4 is free and x4 >= 0
+        // x6 is free and x6 >= 5
+        assert_eq!(expected, rows);
+        rows = machines[1].to_similtaneous_eqns();
+        print_matrix(&rows);
+        gauss_elim_unit(&mut rows);
+        //        x1        x2    x3    x4      x5
+        //[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
+        expected = vec![
+            vec![1, 0, 1, 1, 0, 7],  // x1 + x3 + x4 = 7
+            vec![0, 1, -1, 0, 1, 5], // x2 - x3 + x5 = 5
+            vec![0, 0, 0, 1, 1, 5],  // x4 + x5 = 5 hence x4 = 5
+            vec![0, 0, 0, 0, 1, 0],  // x5 = 0
             vec![0, 0, 0, 0, 0, 0],
         ];
+        // x4 = 5
+        // x3 is free and 5 + x3 > 0
+        // x3 > 0, set x3 = 0
+        // x1 = 2
+        // x2 = 5
         assert_eq!(expected, rows);
+
+        //         x1          x2      x3          x4
+        //[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
+        rows = machines[2].to_similtaneous_eqns();
+        print_matrix(&rows);
+        gauss_elim_unit(&mut rows);
+        println!("soln");
+        expected = vec![
+            vec![1, 1, 1, 0, 10],  // x1 + x2 + x3 = 10
+            vec![0, -1, 0, 1, 1],  // -x2 + x4 = 1
+            vec![0, 0, -1, 0, -5], // -x3 = -5
+            vec![0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0],
+            vec![0, 0, 0, 0, 0],
+        ];
+        // x3 = 5
+        // x4 is free and x4 >= 1
+        // set x4 = 1 => x2 = 0, x1 = 5
+        assert_eq!(expected, rows);
+    }
+
+    #[test]
+    fn test_solver() {
+        let machines = Machine::parse_lines(TEST_DATA);
+        let mut rows = machines[0].to_similtaneous_eqns();
+        gauss_elim_unit(&mut rows);
+        print_matrix(&rows);
+        let solution = solve(&rows);
+        println!("sol: {solution:?}");
     }
 }
